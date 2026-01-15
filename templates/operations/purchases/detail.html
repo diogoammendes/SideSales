@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Compra · SideSales{% endblock %}
+{% block content %}
+<section class="panel">
+    <header class="panel-header">
+        <div>
+            <h2>{{ purchase.title }}</h2>
+            <p class="muted">{{ purchase.description|default:'Sem descrição' }}</p>
+        </div>
+        <div>
+            <a href="{% url 'operations:purchase_update' purchase.pk %}" class="btn ghost">Editar</a>
+            <a href="{% url 'operations:sale_create' %}?purchase={{ purchase.pk }}" class="btn primary">Nova venda</a>
+        </div>
+    </header>
+    <div class="cards">
+        <article class="card">
+            <span class="muted">Investimento base</span>
+            <h3>{{ purchase.total_base|floatformat:2 }} €</h3>
+        </article>
+        <article class="card">
+            <span class="muted">Custos adicionais</span>
+            <h3>{{ purchase.total_additional_costs|floatformat:2 }} €</h3>
+        </article>
+        <article class="card">
+            <span class="muted">Receita</span>
+            <h3>{{ purchase.total_revenue|floatformat:2 }} €</h3>
+        </article>
+        <article class="card">
+            <span class="muted">Resultado</span>
+            <h3 class="{% if purchase.total_profit < 0 %}text-danger{% else %}text-success{% endif %}">{{ purchase.total_profit|floatformat:2 }} €</h3>
+        </article>
+    </div>
+</section>
+
+<section class="panel">
+    <h3>Participações</h3>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Investidor</th>
+                <th>Tipo</th>
+                <th>Valor</th>
+                <th>Valor resolvido</th>
+                <th>Pago em</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for contrib in purchase.contributions.all %}
+                <tr>
+                    <td>{{ contrib.payer }}</td>
+                    <td>{{ contrib.get_contribution_type_display }}</td>
+                    <td>{{ contrib.value|floatformat:2 }}</td>
+                    <td>{{ contrib.resolved_amount|floatformat:2 }}</td>
+                    <td>{{ contrib.paid_on }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="muted">Sem participações registadas.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section class="panel">
+    <h3>Custos adicionais</h3>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Descrição</th>
+                <th>Valor</th>
+                <th>Pago por</th>
+                <th>Data</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cost in purchase.additional_costs.all %}
+                <tr>
+                    <td>{{ cost.label }}</td>
+                    <td>{{ cost.amount|floatformat:2 }}</td>
+                    <td>{{ cost.paid_by|default:'-' }}</td>
+                    <td>{{ cost.incurred_on }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="4" class="muted">Sem custos adicionais.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section class="panel">
+    <h3>Vendas associadas</h3>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Comprador</th>
+                <th>Quantidade</th>
+                <th>Preço unitário</th>
+                <th>Total</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sale in purchase.sales.all %}
+                <tr>
+                    <td>{{ sale.buyer_name }}</td>
+                    <td>{{ sale.quantity }}</td>
+                    <td>{{ sale.unit_price }}</td>
+                    <td>{{ sale.total_price|floatformat:2 }}</td>
+                    <td>{{ sale.get_status_display }}</td>
+                </tr>
+                {% if sale.payments.all %}
+                    <tr>
+                        <td colspan="5">
+                            <strong>Pagamentos:</strong>
+                            <ul>
+                                {% for payment in sale.payments.all %}
+                                    <li>{{ payment.paid_on }} · {{ payment.amount|floatformat:2 }} € · {{ payment.get_method_display }} · Recebido por {{ payment.receiver }}</li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                    </tr>
+                {% endif %}
+            {% empty %}
+                <tr><td colspan="5" class="muted">Sem vendas registadas.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

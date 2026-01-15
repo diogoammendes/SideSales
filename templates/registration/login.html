@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Entrar · SideSales{% endblock %}
+{% block content %}
+<div class="auth-card">
+    <h2>Bem-vindo de volta</h2>
+    <p class="muted">Inicie sessão para aceder ao cockpit financeiro.</p>
+    <form method="post" class="stack">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="message error">
+                {% for error in form.non_field_errors %}
+                    <div>{{ error }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        <div>
+            <label for="id_username">Utilizador</label>
+            {{ form.username }}
+            {% for error in form.username.errors %}
+                <small class="error-text">{{ error }}</small>
+            {% endfor %}
+        </div>
+        <div>
+            <label for="id_password">Password</label>
+            {{ form.password }}
+            {% for error in form.password.errors %}
+                <small class="error-text">{{ error }}</small>
+            {% endfor %}
+        </div>
+        <button type="submit" class="btn primary">Entrar</button>
+    </form>
+</div>
+{% endblock %}

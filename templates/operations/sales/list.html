@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Vendas · SideSales{% endblock %}
+{% block content %}
+<header class="panel-header">
+    <div>
+        <h2>Vendas</h2>
+        <p class="muted">Receitas e pagamentos registados</p>
+    </div>
+    <a href="{% url 'operations:sale_create' %}" class="btn primary">Nova venda</a>
+</header>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Compra</th>
+            <th>Comprador</th>
+            <th>Quantidade</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Pagamentos</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for sale in sales %}
+            <tr>
+                <td>{{ sale.purchase.title }}</td>
+                <td>
+                    <strong>{{ sale.buyer_name }}</strong><br>
+                    <small class="muted">{{ sale.buyer_description|default:'-' }}</small>
+                </td>
+                <td>{{ sale.quantity }} @ {{ sale.unit_price }} €</td>
+                <td>{{ sale.total_price|floatformat:2 }} €</td>
+                <td>{{ sale.get_status_display }}</td>
+                <td>
+                    {% if sale.payments.all %}
+                        {{ sale.payments.count }} registos<br>
+                        <small class="muted">{{ sale.total_payments|floatformat:2 }} € recebidos<br>
+                            {% if sale.outstanding_amount > 0 %}
+                                Falta {{ sale.outstanding_amount|floatformat:2 }} €
+                            {% endif %}
+                        </small>
+                    {% else %}
+                        <span class="muted">Sem pagamentos</span>
+                    {% endif %}
+                </td>
+                <td><a href="{% url 'operations:sale_update' sale.pk %}">editar</a></td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="7" class="muted">Ainda não existem vendas.</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · SideSales{% endblock %}
+{% block content %}
+<section class="cards">
+    <article class="card">
+        <span class="muted">Investimento Total</span>
+        <h2>{{ totals.invested|default:0|floatformat:2 }} €</h2>
+    </article>
+    <article class="card">
+        <span class="muted">Receita Total</span>
+        <h2>{{ totals.revenue|default:0|floatformat:2 }} €</h2>
+    </article>
+    <article class="card">
+        <span class="muted">Resultado</span>
+        <h2 class="{% if totals.profit < 0 %}text-danger{% else %}text-success{% endif %}">{{ totals.profit|default:0|floatformat:2 }} €</h2>
+    </article>
+</section>
+
+<section class="panel">
+    <header class="panel-header">
+        <div>
+            <h3>Compras Recentes</h3>
+            <p class="muted">Custos x receitas consolidadas</p>
+        </div>
+        <a href="{% url 'operations:purchase_create' %}" class="btn primary">Nova compra</a>
+    </header>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Compra</th>
+                <th>Investimento</th>
+                <th>Receita</th>
+                <th>Resultado</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for purchase in purchases %}
+                <tr>
+                    <td>
+                        <strong>{{ purchase.title }}</strong><br>
+                        <small class="muted">{{ purchase.purchased_on }}</small>
+                    </td>
+                    <td>{{ purchase.total_cost|floatformat:2 }} €</td>
+                    <td>{{ purchase.total_revenue|floatformat:2 }} €</td>
+                    <td class="{% if purchase.total_profit < 0 %}text-danger{% else %}text-success{% endif %}">{{ purchase.total_profit|floatformat:2 }} €</td>
+                    <td><a href="{% url 'operations:purchase_detail' purchase.pk %}">ver</a></td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="5" class="muted">Sem compras registadas.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section class="panel">
+    <header class="panel-header">
+        <div>
+            <h3>Ledger por utilizador</h3>
+            <p class="muted">Investimentos vs recebimentos</p>
+        </div>
+    </header>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Utilizador</th>
+                <th>Investido</th>
+                <th>Recebido</th>
+                <th>Saldo</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in ledger %}
+                <tr>
+                    <td>
+                        <strong>{{ entry.user.get_full_name|default:entry.user.username }}</strong>
+                        <small class="muted">{{ entry.user.display_role }}</small>
+                    </td>
+                    <td>{{ entry.invested|floatformat:2 }} €</td>
+                    <td>{{ entry.received|floatformat:2 }} €</td>
+                    <td class="{% if entry.net < 0 %}text-danger{% else %}text-success{% endif %}">{{ entry.net|floatformat:2 }} €</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="4" class="muted">Sem movimentos por utilizador.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
