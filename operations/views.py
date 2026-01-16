@@ -1,3 +1,4 @@
+from collections import defaultdict
 from decimal import Decimal
 
 from django.contrib import messages
@@ -58,29 +59,53 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        purchases = Purchase.objects.prefetch_related('additional_costs', 'sales')
+        purchases = Purchase.objects.prefetch_related(
+            'additional_costs__paid_by', 'contributions__payer', 'sales'
+        )
         total_invested = sum(p.total_cost for p in purchases)
         total_revenue = sum(p.total_revenue for p in purchases)
         total_profit = total_revenue - total_invested
 
+        ledger_map: dict[int, dict[str, Decimal | User]] = defaultdict(
+            lambda: {'user': None, 'invested': Decimal('0'), 'received': Decimal('0')}
+        )
+
+        for user in User.objects.all():
+            ledger_map[user.pk]['user'] = user
+
+        for purchase in purchases:
+            purchase_investments: dict[int, Decimal] = defaultdict(Decimal)
+
+            for contribution in purchase.contributions.all():
+                if contribution.payer_id:
+                    purchase_investments[contribution.payer_id] += contribution.resolved_amount
+
+            for cost in purchase.additional_costs.all():
+                if cost.paid_by_id:
+                    purchase_investments[cost.paid_by_id] += cost.amount
+
+            if purchase.signal_paid_by_id:
+                purchase_investments[purchase.signal_paid_by_id] += purchase.signal_amount_eur or Decimal('0')
+
+            purchase_total_invested = sum(purchase_investments.values())
+            purchase_revenue = purchase.total_revenue
+
+            if not purchase_investments:
+                continue
+
+            for user_id, invested in purchase_investments.items():
+                entry = ledger_map[user_id]
+                entry['invested'] += invested
+                if purchase_total_invested > 0 and purchase_revenue:
+                    entry['received'] += (invested / purchase_total_invested) * purchase_revenue
+
         ledger = []
-        users = User.objects.all()
-        for user in users:
-            contributions = PurchaseContribution.objects.filter(payer=user).select_related('purchase')
-            invested_contributions = sum(item.resolved_amount for item in contributions)
-            invested_costs = (
-                AdditionalCost.objects.filter(paid_by=user).aggregate(total=Sum('amount'))['total']
-                or Decimal('0')
-            )
-            invested_signal = (
-                Purchase.objects.filter(signal_paid_by=user).aggregate(total=Sum('signal_amount_eur'))['total']
-                or Decimal('0')
-            )
-            invested = invested_contributions + invested_costs + invested_signal
-            received = (
-                SalePayment.objects.filter(receiver=user).aggregate(total=Sum('amount'))['total']
-                or Decimal('0')
-            )
+        for entry in ledger_map.values():
+            user = entry['user']
+            if not user:
+                continue
+            invested = entry['invested']
+            received = entry['received']
             ledger.append(
                 {
                     'user': user,
