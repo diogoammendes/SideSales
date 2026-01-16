@@ -61,7 +61,7 @@
     <header class="panel-header">
         <div>
             <h3>Ledger por utilizador</h3>
-            <p class="muted">Investimentos vs recebimentos</p>
+            <p class="muted">Investimentos registados vs pagamentos recebidos (em EUR)</p>
         </div>
     </header>
     <div class="table-wrapper">
@@ -82,8 +82,13 @@
                         <small class="muted">{{ entry.user.display_role }}</small>
                     </td>
                     <td data-label="Investido">{{ entry.invested|floatformat:2 }} €</td>
-                    <td data-label="Recebido">{{ entry.received|floatformat:2 }} €</td>
-                    <td data-label="Saldo" class="{% if entry.net < 0 %}text-danger{% else %}text-success{% endif %}">{{ entry.net|floatformat:2 }} €</td>
+                    <td data-label="Recebido">
+                        {{ entry.received_actual|floatformat:2 }} €
+                        {% if entry.received_attributed and entry.received_attributed != entry.received_actual %}
+                            <small class="muted" title="Receita proporcional pela quota investida">(quota {{ entry.received_attributed|floatformat:2 }} €)</small>
+                        {% endif %}
+                    </td>
+                    <td data-label="Saldo" class="{% if entry.real_balance < 0 %}text-danger{% else %}text-success{% endif %}">{{ entry.real_balance|floatformat:2 }} €</td>
                 </tr>
             {% empty %}
                 <tr>

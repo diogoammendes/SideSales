@@ -67,10 +67,16 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         total_profit = total_revenue - total_invested
 
         ledger_map: dict[int, dict[str, Decimal | User]] = defaultdict(
-            lambda: {'user': None, 'invested': Decimal('0'), 'received': Decimal('0')}
+            lambda: {
+                'user': None,
+                'invested': Decimal('0'),
+                'attributed': Decimal('0'),
+                'actual': Decimal('0'),
+            }
         )
 
-        for user in User.objects.all():
+        active_users = User.objects.filter(is_active=True)
+        for user in active_users:
             ledger_map[user.pk]['user'] = user
 
         for purchase in purchases:
@@ -97,7 +103,17 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 entry = ledger_map[user_id]
                 entry['invested'] += invested
                 if purchase_total_invested > 0 and purchase_revenue:
-                    entry['received'] += (invested / purchase_total_invested) * purchase_revenue
+                    entry['attributed'] += (invested / purchase_total_invested) * purchase_revenue
+
+        payment_totals = (
+            SalePayment.objects.filter(receiver__is_active=True)
+            .values('receiver_id')
+            .annotate(total=Sum('amount'))
+        )
+        for payment in payment_totals:
+            entry = ledger_map.get(payment['receiver_id'])
+            if entry:
+                entry['actual'] = payment['total'] or Decimal('0')
 
         ledger = []
         for entry in ledger_map.values():
@@ -105,13 +121,16 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             if not user:
                 continue
             invested = entry['invested']
-            received = entry['received']
+            attributed = entry['attributed']
+            actual = entry['actual']
             ledger.append(
                 {
                     'user': user,
                     'invested': invested,
-                    'received': received,
-                    'net': received - invested,
+                    'received_actual': actual,
+                    'received_attributed': attributed,
+                    'real_balance': actual - invested,
+                    'attributed_balance': attributed - invested,
                 }
             )
 
@@ -430,7 +449,7 @@ class UserListView(LoginRequiredMixin, RoleRequiredMixin, ListView):
     required_roles = (User.Roles.ADMIN,)
 
     def get_queryset(self):
-        return User.objects.order_by('first_name', 'username')
+        return User.objects.filter(is_active=True).order_by('first_name', 'username')
 
 
 class UserCreateView(LoginRequiredMixin, RoleRequiredMixin, FormView):
