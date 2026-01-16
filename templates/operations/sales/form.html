@@ -2,7 +2,7 @@
 {% block title %}{{ title }} · Vendas{% endblock %}
 {% block content %}
 <h2>{{ title }}</h2>
-<form method="post">
+<form method="post" class="stack">
     {% csrf_token %}
     {{ form.non_field_errors }}
     <div class="form-grid">
@@ -17,29 +17,9 @@
         {% endfor %}
     </div>
 
-    <section>
-        <h3>Pagamentos</h3>
-        {{ payment_formset.management_form }}
-        <div class="form-grid">
-            {% for formset_form in payment_formset %}
-                <div class="formset-card">
-                    {% for field in formset_form.visible_fields %}
-                        <div class="form-control">
-                            <label>{{ field.label }}</label>
-                            {{ field }}
-                            {% for error in field.errors %}
-                                <small class="error-text">{{ error }}</small>
-                            {% endfor %}
-                        </div>
-                    {% endfor %}
-                    {% if formset_form.can_delete %}
-                        <label class="checkbox-inline">{{ formset_form.DELETE }} remover</label>
-                    {% endif %}
-                </div>
-            {% endfor %}
-        </div>
-    </section>
-
+    <div class="info-banner">
+        <p>Após gravar a venda, regista os pagamentos diretamente na página da venda, linha a linha.</p>
+    </div>
     <button type="submit" class="btn primary">{{ submit_label }}</button>
 </form>
 {% endblock %}

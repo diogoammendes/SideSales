@@ -34,8 +34,15 @@ urlpatterns = [
     ),
     # Sales
     path('vendas/', views.SaleListView.as_view(), name='sale_list'),
+    path('vendas/<int:pk>/', views.SaleDetailView.as_view(), name='sale_detail'),
     path('vendas/nova/', views.SaleCreateView.as_view(), name='sale_create'),
     path('vendas/<int:pk>/editar/', views.SaleUpdateView.as_view(), name='sale_update'),
+    path('vendas/<int:pk>/pagamentos/', views.SalePaymentCreateView.as_view(), name='sale_payment_create'),
+    path(
+        'vendas/<int:pk>/pagamentos/<int:payment_pk>/apagar/',
+        views.SalePaymentDeleteView.as_view(),
+        name='sale_payment_delete',
+    ),
     # Users
     path('utilizadores/', views.UserListView.as_view(), name='user_list'),
     path('utilizadores/novo/', views.UserCreateView.as_view(), name='user_create'),

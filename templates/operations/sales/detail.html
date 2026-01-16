@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Venda · SideSales{% endblock %}
+{% block content %}
+<section class="panel">
+    <header class="panel-header">
+        <div>
+            <h2>Venda para {{ sale.buyer_name }}</h2>
+            <p class="muted">
+                Compra associada:
+                <a href="{% url 'operations:purchase_detail' sale.purchase.pk %}">{{ sale.purchase.title }}</a>
+                · Registada em {{ sale.sold_on|date:"d/m/Y" }}
+            </p>
+            {% if sale.notes %}
+                <p class="muted">Notas: {{ sale.notes }}</p>
+            {% endif %}
+        </div>
+        <div class="line-actions">
+            <a href="{% url 'operations:sale_update' sale.pk %}" class="btn secondary">Editar venda</a>
+            <a href="{% url 'operations:sale_list' %}" class="btn ghost">Voltar à lista</a>
+        </div>
+    </header>
+    <div class="cards">
+        <article class="card">
+            <span class="muted">Total da venda</span>
+            <h3>{{ sale.total_price|floatformat:2 }} €</h3>
+            <small class="muted">{{ sale.quantity|floatformat:2 }} @ {{ sale.unit_price|floatformat:2 }} €</small>
+        </article>
+        <article class="card">
+            <span class="muted">Recebido</span>
+            <h3 class="text-success">{{ sale.total_payments|floatformat:2 }} €</h3>
+        </article>
+        <article class="card">
+            <span class="muted">Em falta</span>
+            <h3 class="{% if sale.outstanding_amount > 0 %}text-danger{% else %}text-success{% endif %}">{{ sale.outstanding_amount|floatformat:2 }} €</h3>
+        </article>
+        <article class="card">
+            <span class="muted">Estado</span>
+            <h3>{{ sale.get_status_display }}</h3>
+        </article>
+    </div>
+</section>
+
+<section class="panel">
+    <header class="panel-header">
+        <div>
+            <h3>Pagamentos</h3>
+            <p class="muted">Regista e acompanha linhas de pagamento desta venda.</p>
+        </div>
+    </header>
+    {% if user.is_superuser or user.role == 'ADMIN' or user.role == 'MANAGER' %}
+        <div class="entry-form">
+            <form method="post" action="{% url 'operations:sale_payment_create' sale.pk %}">
+                {% csrf_token %}
+                {{ payment_form.non_field_errors }}
+                <div class="form-grid compact">
+                    {% for field in payment_form %}
+                        <div class="form-control compact">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% for error in field.errors %}
+                                <small class="error-text">{{ error }}</small>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="entry-actions">
+                    <button type="submit" class="btn primary">Adicionar pagamento</button>
+                </div>
+            </form>
+        </div>
+    {% endif %}
+
+    {% if sale.payments.exists %}
+        <div class="line-table">
+            {% for payment in sale.payments.all %}
+                <div class="line-row">
+                    <div class="line-col">
+                        <strong>{{ payment.receiver }}</strong>
+                        <span class="badge">{{ payment.get_method_display }}</span>
+                        {% if payment.notes %}
+                            <p class="muted">{{ payment.notes }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="line-col">
+                        <span class="muted">Valor</span>
+                        <p>{{ payment.amount|floatformat:2 }} €</p>
+                    </div>
+                    <div class="line-col">
+                        <span class="muted">Pago em</span>
+                        <p>{{ payment.paid_on|date:"d/m/Y" }}</p>
+                    </div>
+                    {% if user.is_superuser or user.role == 'ADMIN' or user.role == 'MANAGER' %}
+                        <div class="line-actions">
+                            <form method="post" action="{% url 'operations:sale_payment_delete' sale.pk payment.pk %}" class="inline-delete" onsubmit="return confirm('Remover este pagamento?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn ghost danger">Eliminar</button>
+                            </form>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="muted">Ainda não existem pagamentos registados.</p>
+    {% endif %}
+</section>
+{% endblock %}

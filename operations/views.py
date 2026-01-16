@@ -20,7 +20,7 @@ from .forms import (
     PurchaseForm,
     PurchaseContributionForm,
     SaleForm,
-    SalePaymentFormSet,
+    SalePaymentForm,
     UserCreateForm,
     UserUpdateForm,
 )
@@ -284,19 +284,31 @@ class SaleListView(LoginRequiredMixin, ListView):
         return Sale.objects.select_related('purchase').prefetch_related('payments').order_by('-sold_on')
 
 
+class SaleDetailView(LoginRequiredMixin, DetailView):
+    model = Sale
+    context_object_name = 'sale'
+    template_name = 'operations/sales/detail.html'
+
+    def get_queryset(self):
+        return Sale.objects.select_related('purchase').prefetch_related('payments__receiver')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['payment_form'] = SalePaymentForm()
+        return context
+
+
 class SaleCreateView(LoginRequiredMixin, RoleRequiredMixin, View):
     template_name = 'operations/sales/form.html'
     required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
 
     def get(self, request):
         form = SaleForm(initial={'purchase': request.GET.get('purchase')})
-        payment_formset = self._build_formset()
         return render(
             request,
             self.template_name,
             {
                 'form': form,
-                'payment_formset': payment_formset,
                 'title': _('Nova Venda'),
                 'submit_label': _('Guardar Venda'),
             },
@@ -304,29 +316,20 @@ class SaleCreateView(LoginRequiredMixin, RoleRequiredMixin, View):
 
     def post(self, request):
         form = SaleForm(request.POST)
-        dummy_sale = Sale()
-        payment_formset = self._build_formset(data=request.POST, instance=dummy_sale)
-        if form.is_valid() and payment_formset.is_valid():
-            with transaction.atomic():
-                sale = form.save()
-                payment_formset.instance = sale
-                payment_formset.save()
+        if form.is_valid():
+            sale = form.save()
             messages.success(request, _('Venda registada.'))
-            return redirect('operations:sale_list')
+            return redirect('operations:sale_detail', pk=sale.pk)
         messages.error(request, _('Por favor corrija os erros abaixo.'))
         return render(
             request,
             self.template_name,
             {
                 'form': form,
-                'payment_formset': payment_formset,
                 'title': _('Nova Venda'),
                 'submit_label': _('Guardar Venda'),
             },
         )
-
-    def _build_formset(self, data=None, instance=None):
-        return SalePaymentFormSet(data=data, instance=instance, prefix='payment')
 
 
 class SaleUpdateView(LoginRequiredMixin, RoleRequiredMixin, View):
@@ -339,13 +342,11 @@ class SaleUpdateView(LoginRequiredMixin, RoleRequiredMixin, View):
 
     def get(self, request, pk):
         form = SaleForm(instance=self.sale)
-        payment_formset = self._build_formset(instance=self.sale)
         return render(
             request,
             self.template_name,
             {
                 'form': form,
-                'payment_formset': payment_formset,
                 'title': _('Editar Venda'),
                 'submit_label': _('Atualizar Venda'),
             },
@@ -353,28 +354,47 @@ class SaleUpdateView(LoginRequiredMixin, RoleRequiredMixin, View):
 
     def post(self, request, pk):
         form = SaleForm(request.POST, instance=self.sale)
-        payment_formset = self._build_formset(data=request.POST, instance=self.sale)
-        if form.is_valid() and payment_formset.is_valid():
-            with transaction.atomic():
-                sale = form.save()
-                payment_formset.instance = sale
-                payment_formset.save()
+        if form.is_valid():
+            sale = form.save()
             messages.success(request, _('Venda atualizada.'))
-            return redirect('operations:sale_list')
+            return redirect('operations:sale_detail', pk=sale.pk)
         messages.error(request, _('Por favor corrija os erros abaixo.'))
         return render(
             request,
             self.template_name,
             {
                 'form': form,
-                'payment_formset': payment_formset,
                 'title': _('Editar Venda'),
                 'submit_label': _('Atualizar Venda'),
             },
         )
 
-    def _build_formset(self, data=None, instance=None):
-        return SalePaymentFormSet(data=data, instance=instance, prefix='payment')
+
+class SalePaymentCreateView(LoginRequiredMixin, RoleRequiredMixin, View):
+    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
+
+    def post(self, request, pk):
+        sale = get_object_or_404(Sale, pk=pk)
+        form = SalePaymentForm(request.POST)
+        if form.is_valid():
+            payment = form.save(commit=False)
+            payment.sale = sale
+            payment.save()
+            messages.success(request, _('Pagamento registado.'))
+        else:
+            for error in form.errors.values():
+                messages.error(request, error)
+        return redirect('operations:sale_detail', pk=pk)
+
+
+class SalePaymentDeleteView(LoginRequiredMixin, RoleRequiredMixin, View):
+    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
+
+    def post(self, request, pk, payment_pk):
+        payment = get_object_or_404(SalePayment, pk=payment_pk, sale_id=pk)
+        payment.delete()
+        messages.success(request, _('Pagamento removido.'))
+        return redirect('operations:sale_detail', pk=pk)
 
 
 class UserListView(LoginRequiredMixin, RoleRequiredMixin, ListView):
