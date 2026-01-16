@@ -18,12 +18,11 @@
             <th>Total</th>
             <th>Status</th>
             <th>Pagamentos</th>
-            <th></th>
         </tr>
     </thead>
     <tbody>
         {% for sale in sales %}
-            <tr>
+            <tr class="table-row-link" role="button" tabindex="0" data-href="{% url 'operations:sale_detail' sale.pk %}" onclick="window.location.href=this.dataset.href" onkeypress="if(event.key==='Enter'){ window.location.href=this.dataset.href; }">
                 <td data-label="Compra">{{ sale.purchase.title }}</td>
                 <td data-label="Comprador">
                     <strong>{{ sale.buyer_name }}</strong><br>
@@ -44,7 +43,6 @@
                         <span class="muted">Sem pagamentos</span>
                     {% endif %}
                 </td>
-                <td data-label="Ações"><a href="{% url 'operations:sale_update' sale.pk %}">editar</a></td>
             </tr>
         {% empty %}
             <tr>

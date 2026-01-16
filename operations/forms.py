@@ -40,6 +40,11 @@ class PurchaseForm(forms.ModelForm):
             'signal_paid_on': forms.DateInput(attrs={'type': 'date'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'signal_paid_by' in self.fields:
+            self.fields['signal_paid_by'].queryset = User.objects.filter(is_active=True)
+
 
 class PurchaseContributionForm(forms.ModelForm):
     class Meta:
@@ -47,12 +52,22 @@ class PurchaseContributionForm(forms.ModelForm):
         fields = ['payer', 'contribution_type', 'value', 'paid_on', 'notes']
         widgets = {'paid_on': forms.DateInput(attrs={'type': 'date'})}
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'payer' in self.fields:
+            self.fields['payer'].queryset = User.objects.filter(is_active=True)
+
 
 class AdditionalCostForm(forms.ModelForm):
     class Meta:
         model = AdditionalCost
         fields = ['label', 'amount', 'paid_by', 'incurred_on']
         widgets = {'incurred_on': forms.DateInput(attrs={'type': 'date'})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'paid_by' in self.fields:
+            self.fields['paid_by'].queryset = User.objects.filter(is_active=True)
 
 
 class SaleForm(forms.ModelForm):
@@ -76,6 +91,11 @@ class SalePaymentForm(forms.ModelForm):
         model = SalePayment
         fields = ['receiver', 'amount', 'method', 'paid_on', 'notes']
         widgets = {'paid_on': forms.DateInput(attrs={'type': 'date'})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'receiver' in self.fields:
+            self.fields['receiver'].queryset = User.objects.filter(is_active=True)
 
 
 PurchaseContributionFormSet = inlineformset_factory(
