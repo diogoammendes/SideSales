@@ -19,15 +19,16 @@
             <th>Investimento total</th>
             <th>Receita</th>
             <th>Resultado</th>
-            <th></th>
         </tr>
     </thead>
     <tbody>
         {% for purchase in purchases %}
             <tr>
                 <td data-label="Título">
-                    <strong>{{ purchase.title }}</strong><br>
-                    <small class="muted">{{ purchase.purchased_on|date:"d/m/Y" }}</small>
+                    <a href="{% url 'operations:purchase_detail' purchase.pk %}" class="cell-link">
+                        <strong>{{ purchase.title }}</strong><br>
+                        <small class="muted">{{ purchase.purchased_on|date:"d/m/Y" }}</small>
+                    </a>
                 </td>
                 <td data-label="Quantidade">
                     {{ purchase.quantity|floatformat:2 }}
@@ -53,7 +54,6 @@
                 <td data-label="Investimento total">{{ purchase.total_cost|floatformat:2 }} €</td>
                 <td data-label="Receita">{{ purchase.total_revenue|floatformat:2 }} €</td>
                 <td data-label="Resultado" class="{% if purchase.total_profit < 0 %}text-danger{% else %}text-success{% endif %}">{{ purchase.total_profit|floatformat:2 }} €</td>
-                <td data-label="Ações"><a href="{% url 'operations:purchase_detail' purchase.pk %}">ver</a></td>
             </tr>
         {% empty %}
             <tr>

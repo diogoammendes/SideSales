@@ -12,7 +12,7 @@
 <table class="table">
     <thead>
         <tr>
-            <th>Compra</th>
+            <th>Título</th>
             <th>Comprador</th>
             <th>Quantidade</th>
             <th>Total</th>
@@ -23,7 +23,14 @@
     <tbody>
         {% for sale in sales %}
             <tr class="table-row-link" role="button" tabindex="0" data-href="{% url 'operations:sale_detail' sale.pk %}" onclick="window.location.href=this.dataset.href" onkeypress="if(event.key==='Enter'){ window.location.href=this.dataset.href; }">
-                <td data-label="Compra">{{ sale.purchase.title }}</td>
+                <td data-label="Título">
+                    <a href="{% url 'operations:sale_detail' sale.pk %}" class="cell-link">
+                        <strong>Venda #{{ sale.pk }}</strong>
+                    </a><br>
+                    <a href="{% url 'operations:purchase_detail' sale.purchase.pk %}" class="cell-link muted" onclick="event.stopPropagation();" onkeypress="event.stopPropagation();">
+                        Compra: {{ sale.purchase.title }}
+                    </a>
+                </td>
                 <td data-label="Comprador">
                     <strong>{{ sale.buyer_name }}</strong><br>
                     <small class="muted">{{ sale.buyer_description|default:'-' }}</small>
