@@ -32,6 +32,13 @@ def _split_env_list(value: str) -> list[str]:
     return [item.strip() for item in value.split(',') if item.strip()]
 
 
+def _normalize_host(host: str) -> str:
+    cleaned = host.strip().replace('https://', '').replace('http://', '')
+    if not cleaned:
+        return ''
+    return cleaned.split('/')[0]
+
+
 def _normalize_origin(origin: str) -> str:
     cleaned = origin.strip().replace('\\', '/').replace(':/', '://', 1)
     if not cleaned:
@@ -42,7 +49,7 @@ def _normalize_origin(origin: str) -> str:
 
 
 ALLOWED_HOSTS_ENV = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost')
-ALLOWED_HOSTS = _split_env_list(ALLOWED_HOSTS_ENV)
+ALLOWED_HOSTS = [host for host in (_normalize_host(item) for item in _split_env_list(ALLOWED_HOSTS_ENV)) if host]
 CSRF_TRUSTED_ORIGINS_ENV = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
 CSRF_TRUSTED_ORIGINS = [
     origin for origin in (_normalize_origin(item) for item in _split_env_list(CSRF_TRUSTED_ORIGINS_ENV)) if origin
