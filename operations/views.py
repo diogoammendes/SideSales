@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.contrib.auth.views import LoginView as AuthLoginView
+from django.contrib.auth.forms import AuthenticationForm, SetPasswordForm, UserCreationForm
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Sum
@@ -444,11 +444,33 @@ class UserUpdateView(LoginRequiredMixin, RoleRequiredMixin, View):
             },
         )
 
+
+class UserPasswordUpdateView(LoginRequiredMixin, RoleRequiredMixin, View):
+    template_name = 'operations/users/password.html'
+    required_roles = (User.Roles.ADMIN,)
+
+    def dispatch(self, request, *args, **kwargs):
+        self.user_obj = get_object_or_404(User, pk=kwargs['pk'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, pk):
+        form = SetPasswordForm(user=self.user_obj)
+        return render(
+            request,
+            self.template_name,
+            {
+                'form': form,
+                'user_obj': self.user_obj,
+                'title': _('Alterar password'),
+                'submit_label': _('Guardar nova password'),
+            },
+        )
+
     def post(self, request, pk):
-        form = UserUpdateForm(request.POST, instance=self.user_obj)
+        form = SetPasswordForm(user=self.user_obj, data=request.POST)
         if form.is_valid():
             form.save()
-            messages.success(request, _('Utilizador atualizado.'))
+            messages.success(request, _('Password atualizada para %(user)s.') % {'user': self.user_obj.get_full_name() or self.user_obj.username})
             return redirect('operations:user_list')
         messages.error(request, _('Por favor corrija os erros abaixo.'))
         return render(
@@ -456,7 +478,8 @@ class UserUpdateView(LoginRequiredMixin, RoleRequiredMixin, View):
             self.template_name,
             {
                 'form': form,
-                'title': _('Editar Utilizador'),
-                'submit_label': _('Atualizar Utilizador'),
+                'user_obj': self.user_obj,
+                'title': _('Alterar password'),
+                'submit_label': _('Guardar nova password'),
             },
         )
