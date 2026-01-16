@@ -14,6 +14,33 @@
     </header>
     <div class="cards">
         <article class="card">
+            <span class="muted">Valor total ({{ purchase.total_currency|default:'EUR' }})</span>
+            <h3>
+                {% if purchase.total_amount_original %}
+                    {{ purchase.total_amount_original|floatformat:2 }} {{ purchase.total_currency|default:'EUR' }}
+                {% else %}
+                    -
+                {% endif %}
+            </h3>
+            <small class="muted">{{ purchase.total_amount_eur|default:0|floatformat:2 }} €</small>
+        </article>
+        <article class="card">
+            <span class="muted">Sinal recebido</span>
+            <h3>
+                {% if purchase.signal_amount_original %}
+                    {{ purchase.signal_amount_original|floatformat:2 }} {{ purchase.signal_currency|default:'EUR' }}
+                {% else %}
+                    -
+                {% endif %}
+            </h3>
+            <small class="muted">{{ purchase.signal_amount_eur|default:0|floatformat:2 }} €</small>
+        </article>
+        <article class="card">
+            <span class="muted">Quantidade</span>
+            <h3>{{ purchase.quantity|floatformat:2 }}</h3>
+            <small class="muted">Custo unitário {{ purchase.unit_cost|floatformat:2 }} €</small>
+        </article>
+        <article class="card">
             <span class="muted">Investimento base</span>
             <h3>{{ purchase.total_base|floatformat:2 }} €</h3>
         </article>
@@ -34,56 +61,66 @@
 
 <section class="panel">
     <h3>Participações</h3>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Investidor</th>
-                <th>Tipo</th>
-                <th>Valor</th>
-                <th>Valor resolvido</th>
-                <th>Pago em</th>
-            </tr>
-        </thead>
-        <tbody>
+    {% if purchase.contributions.exists %}
+        <div class="line-table">
             {% for contrib in purchase.contributions.all %}
-                <tr>
-                    <td>{{ contrib.payer }}</td>
-                    <td>{{ contrib.get_contribution_type_display }}</td>
-                    <td>{{ contrib.value|floatformat:2 }}</td>
-                    <td>{{ contrib.resolved_amount|floatformat:2 }}</td>
-                    <td>{{ contrib.paid_on }}</td>
-                </tr>
-            {% empty %}
-                <tr><td colspan="5" class="muted">Sem participações registadas.</td></tr>
+                <div class="line-row">
+                    <div class="line-col">
+                        <strong>{{ contrib.payer }}</strong>
+                        <span class="badge">{{ contrib.get_contribution_type_display }}</span>
+                        {% if contrib.notes %}
+                            <p class="muted">{{ contrib.notes }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="line-col">
+                        <span class="muted">Valor</span>
+                        <p>
+                            {{ contrib.value|floatformat:2 }}
+                            {% if contrib.contribution_type == contrib.ContributionType.PERCENTAGE %}%{% else %} €{% endif %}
+                        </p>
+                    </div>
+                    <div class="line-col">
+                        <span class="muted">Valor resolvido (EUR)</span>
+                        <p>{{ contrib.resolved_amount|floatformat:2 }} €</p>
+                    </div>
+                    <div class="line-col">
+                        <span class="muted">Pago em</span>
+                        <p>{{ contrib.paid_on|date:"d/m/Y" }}</p>
+                    </div>
+                </div>
             {% endfor %}
-        </tbody>
-    </table>
+        </div>
+    {% else %}
+        <p class="muted">Sem participações registadas.</p>
+    {% endif %}
 </section>
 
 <section class="panel">
     <h3>Custos adicionais</h3>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Descrição</th>
-                <th>Valor</th>
-                <th>Pago por</th>
-                <th>Data</th>
-            </tr>
-        </thead>
-        <tbody>
+    {% if purchase.additional_costs.exists %}
+        <div class="line-table">
             {% for cost in purchase.additional_costs.all %}
-                <tr>
-                    <td>{{ cost.label }}</td>
-                    <td>{{ cost.amount|floatformat:2 }}</td>
-                    <td>{{ cost.paid_by|default:'-' }}</td>
-                    <td>{{ cost.incurred_on }}</td>
-                </tr>
-            {% empty %}
-                <tr><td colspan="4" class="muted">Sem custos adicionais.</td></tr>
+                <div class="line-row">
+                    <div class="line-col">
+                        <strong>{{ cost.label }}</strong>
+                        {% if cost.paid_by %}
+                            <span class="badge">Pago por {{ cost.paid_by }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="line-col">
+                        <span class="muted">Valor</span>
+                        <p>{{ cost.amount|floatformat:2 }} €</p>
+                    </div>
+                    <div class="line-col">
+                        <span class="muted">Incurrido em</span>
+                        <p>{{ cost.incurred_on|date:"d/m/Y" }}</p>
+                    </div>
+                </div>
             {% endfor %}
-        </tbody>
-    </table>
+        </div>
+    {% else %}
+        <p class="muted">Sem custos adicionais.</p>
+    {% endif %}
 </section>
 
 <section class="panel">

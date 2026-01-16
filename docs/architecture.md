@@ -49,10 +49,15 @@ erDiagram
         string title
         text   description
         decimal quantity
-        decimal unit_cost
         date   purchased_on
-        decimal signal_amount
-        decimal total_base (computed: quantity * unit_cost)
+        decimal total_amount_original (nullable)
+        string  total_currency
+        decimal total_amount_eur
+        decimal signal_amount_original (nullable)
+        string  signal_currency
+        decimal signal_amount_eur
+        decimal unit_cost (computed: total_amount_eur / quantity)
+        decimal total_base (computed: total_amount_eur)
         decimal total_additional (aggregate of AdditionalCost)
         decimal total_cost (computed)
     }

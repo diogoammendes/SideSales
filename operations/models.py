@@ -35,9 +35,13 @@ class Purchase(TimeStampedModel):
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     quantity = models.DecimalField(max_digits=12, decimal_places=2)
-    unit_cost = models.DecimalField(max_digits=12, decimal_places=2)
     purchased_on = models.DateField(default=timezone.now)
-    signal_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    total_amount_original = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    total_currency = models.CharField(max_length=10, blank=True)
+    total_amount_eur = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    signal_amount_original = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    signal_currency = models.CharField(max_length=10, blank=True)
+    signal_amount_eur = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     signal_paid_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -54,8 +58,14 @@ class Purchase(TimeStampedModel):
         return self.title
 
     @property
+    def unit_cost(self) -> Decimal:
+        if not self.quantity:
+            return Decimal('0')
+        return (self.total_amount_eur or Decimal('0')) / self.quantity
+
+    @property
     def total_base(self) -> Decimal:
-        return (self.quantity or Decimal('0')) * (self.unit_cost or Decimal('0'))
+        return self.total_amount_eur or Decimal('0')
 
     @property
     def total_additional_costs(self) -> Decimal:
@@ -68,7 +78,7 @@ class Purchase(TimeStampedModel):
 
     @property
     def total_cost(self) -> Decimal:
-        return self.total_base + self.signal_amount + self.total_additional_costs
+        return self.total_base + (self.signal_amount_eur or Decimal('0')) + self.total_additional_costs
 
     @property
     def total_revenue(self) -> Decimal:

@@ -13,7 +13,9 @@
         <tr>
             <th>Título</th>
             <th>Quantidade</th>
-            <th>Custo total</th>
+            <th>Total compra</th>
+            <th>Sinal</th>
+            <th>Investimento total</th>
             <th>Receita</th>
             <th>Resultado</th>
             <th></th>
@@ -24,9 +26,29 @@
             <tr>
                 <td>
                     <strong>{{ purchase.title }}</strong><br>
-                    <small class="muted">{{ purchase.purchased_on }}</small>
+                    <small class="muted">{{ purchase.purchased_on|date:"d/m/Y" }}</small>
                 </td>
-                <td>{{ purchase.quantity }} @ {{ purchase.unit_cost }} €</td>
+                <td>
+                    {{ purchase.quantity|floatformat:2 }}
+                    <br>
+                    <small class="muted">Custo unitário {{ purchase.unit_cost|floatformat:2 }} €</small>
+                </td>
+                <td>
+                    {% if purchase.total_amount_original %}
+                        <strong>{{ purchase.total_amount_original|floatformat:2 }} {{ purchase.total_currency|default:'EUR' }}</strong><br>
+                    {% else %}
+                        <span class="muted">-</span><br>
+                    {% endif %}
+                    <small class="muted">{{ purchase.total_amount_eur|floatformat:2 }} €</small>
+                </td>
+                <td>
+                    {% if purchase.signal_amount_original %}
+                        <strong>{{ purchase.signal_amount_original|floatformat:2 }} {{ purchase.signal_currency|default:'EUR' }}</strong><br>
+                    {% else %}
+                        <span class="muted">-</span><br>
+                    {% endif %}
+                    <small class="muted">{{ purchase.signal_amount_eur|floatformat:2 }} €</small>
+                </td>
                 <td>{{ purchase.total_cost|floatformat:2 }} €</td>
                 <td>{{ purchase.total_revenue|floatformat:2 }} €</td>
                 <td class="{% if purchase.total_profit < 0 %}text-danger{% else %}text-success{% endif %}">{{ purchase.total_profit|floatformat:2 }} €</td>
