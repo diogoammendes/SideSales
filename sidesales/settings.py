@@ -87,6 +87,28 @@ ALLOWED_HOSTS = sorted({*ALLOWED_HOSTS, *_hosts_from_origins(CSRF_TRUSTED_ORIGIN
 ALLOWED_HOSTS = [host for host in ALLOWED_HOSTS if host]
 
 
+def _origin_from_host(host: str, scheme: str) -> str:
+    trimmed = host.strip()
+    if not trimmed:
+        return ''
+    if ':' in trimmed and not trimmed.startswith('['):
+        trimmed = f'[{trimmed}]'
+    return f'{scheme}://{trimmed}'
+
+
+csrf_origins_set = set(CSRF_TRUSTED_ORIGINS)
+for host in ALLOWED_HOSTS:
+    https_origin = _origin_from_host(host, 'https')
+    if https_origin:
+        csrf_origins_set.add(https_origin)
+    if host in {'localhost', '127.0.0.1'}:
+        http_origin = _origin_from_host(host, 'http')
+        if http_origin:
+            csrf_origins_set.add(http_origin)
+
+CSRF_TRUSTED_ORIGINS = sorted(csrf_origins_set)
+
+
 # Application definition
 
 INSTALLED_APPS = [
