@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.forms import AuthenticationForm, SetPasswordForm, UserCreationForm
+from django.contrib.auth.views import LoginView as AuthLoginView
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Sum
