@@ -41,12 +41,39 @@ def _normalize_host(host: str) -> str:
 
 
 def _normalize_origin(origin: str) -> str:
-    cleaned = origin.strip().replace('\\', '/').replace(':/', '://', 1)
-    if not cleaned:
+    raw = origin.strip().replace('\\', '/')
+    if not raw:
         return ''
-    if not cleaned.startswith(('http://', 'https://')):
-        cleaned = f"https://{cleaned.lstrip('/')}"
-    return cleaned
+    if not raw.startswith(('http://', 'https://')):
+        candidate = raw.lstrip('/')
+        if candidate.count(':') > 1 and not candidate.startswith('['):
+            candidate = f'[{candidate}]'
+        raw = f'https://{candidate}'
+    try:
+        parsed = urlparse(raw)
+    except ValueError:
+        return ''
+    if not parsed.scheme or not parsed.hostname:
+        return ''
+    hostname = parsed.hostname
+    if ':' in hostname and not hostname.startswith('['):
+        hostname = f'[{hostname}]'
+    netloc = hostname
+    if parsed.port:
+        netloc = f'{hostname}:{parsed.port}'
+    return f'{parsed.scheme}://{netloc}'
+
+
+def _hosts_from_origins(origins: list[str]) -> set[str]:
+    hosts: set[str] = set()
+    for origin in origins:
+        try:
+            parsed = urlparse(origin)
+        except ValueError:
+            continue
+        if parsed.hostname:
+            hosts.add(parsed.hostname)
+    return hosts
 
 
 ALLOWED_HOSTS_ENV = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost')
@@ -56,12 +83,7 @@ CSRF_TRUSTED_ORIGINS = [
     origin for origin in (_normalize_origin(item) for item in _split_env_list(CSRF_TRUSTED_ORIGINS_ENV)) if origin
 ]
 
-ALLOWED_HOSTS = sorted(
-    {
-        *ALLOWED_HOSTS,
-        *(urlparse(origin).hostname or '' for origin in CSRF_TRUSTED_ORIGINS),
-    }
-)
+ALLOWED_HOSTS = sorted({*ALLOWED_HOSTS, *_hosts_from_origins(CSRF_TRUSTED_ORIGINS)})
 ALLOWED_HOSTS = [host for host in ALLOWED_HOSTS if host]
 
 
