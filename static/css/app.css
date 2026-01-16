@@ -1,15 +1,16 @@
 :root {
-    --bg: #03060c;
-    --bg-soft: #0b1120;
-    --card: #0f1116;
-    --card-muted: #151826;
-    --accent: #55d0ff;
-    --accent-strong: #00a0e7;
-    --text: #f1f5f9;
-    --text-muted: #9aa4b8;
-    --border: rgba(255, 255, 255, 0.08);
-    --danger: #ff6b6b;
-    --success: #47d16c;
+    --bg: #f3f5f9;
+    --bg-soft: #e3e8f0;
+    --card: #ffffff;
+    --card-muted: #f8fafc;
+    --accent: #2563eb;
+    --accent-strong: #1d4ed8;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --border: rgba(15, 23, 42, 0.12);
+    --border-strong: rgba(15, 23, 42, 0.2);
+    --danger: #dc2626;
+    --success: #16a34a;
     font-family: 'Space Grotesk', sans-serif;
 }
 
@@ -19,7 +20,7 @@
 
 body {
     margin: 0;
-    background: radial-gradient(circle at 20% 20%, #132047, var(--bg));
+    background: radial-gradient(circle at 20% 20%, #e0e7ff, var(--bg));
     color: var(--text);
     min-height: 100vh;
 }
@@ -27,6 +28,8 @@ body {
 .app-shell {
     padding: 2rem;
     min-height: 100vh;
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
 .app-header {
@@ -39,7 +42,7 @@ body {
     border: 1px solid var(--border);
     border-radius: 20px;
     padding: 1.5rem 2rem;
-    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
 }
 
 .app-brand {
@@ -58,6 +61,10 @@ body {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--card-muted);
 }
 
 .user-menu > div {
@@ -86,6 +93,7 @@ body {
     gap: 1rem;
     position: relative;
     z-index: 10;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
 }
 
 .nav-link,
@@ -95,6 +103,7 @@ body {
     color: var(--text);
     text-decoration: none;
     font-weight: 500;
+    transition: color 0.2s ease;
 }
 
 .nav-group span {
@@ -104,12 +113,18 @@ body {
     letter-spacing: 0.1rem;
 }
 
+.nav-link:hover,
+.nav-group a:hover {
+    color: var(--accent);
+}
+
 .content {
     background: var(--card);
-    border-radius: 18px;
+    border-radius: 24px;
     padding: 2rem;
     border: 1px solid var(--border);
     min-width: 0;
+    box-shadow: 0 25px 60px rgba(15, 23, 42, 0.08);
 }
 
 .table {
@@ -120,16 +135,16 @@ body {
 .table th,
 .table td {
     padding: 0.75rem 1rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .table-wrapper {
     margin-top: 1rem;
     border: 1px solid var(--border);
     border-radius: 18px;
-    background: var(--card-muted);
+    background: var(--card);
     overflow-x: auto;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+    box-shadow: inset 0 1px 0 rgba(15, 23, 42, 0.04);
 }
 
 .line-table {
@@ -144,8 +159,9 @@ body {
     gap: 1rem;
     padding: 1rem;
     border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border);
+    background: var(--card);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
 }
 
 .line-col {
@@ -171,12 +187,14 @@ body {
 .badge {
     display: inline-flex;
     align-items: center;
-    padding: 0.1rem 0.6rem;
+    padding: 0.15rem 0.65rem;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--accent-strong);
     font-size: 0.75rem;
     letter-spacing: 0.02em;
     text-transform: uppercase;
+    font-weight: 600;
 }
 
 .panel {
@@ -185,6 +203,7 @@ body {
     border-radius: 18px;
     border: 1px solid var(--border);
     padding: 1.5rem;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
 }
 
 .panel-header {
@@ -213,23 +232,45 @@ body {
     justify-content: center;
     gap: 0.5rem;
     padding: 0.65rem 1.3rem;
-    border-radius: 100px;
+    border-radius: 999px;
     text-decoration: none;
     border: none;
     cursor: pointer;
     font-weight: 600;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
 }
 
 .btn.primary {
     background: linear-gradient(120deg, var(--accent), var(--accent-strong));
-    color: #00111f;
-    box-shadow: 0 20px 40px rgba(0, 160, 231, 0.25);
+    color: #f8fafc;
+    box-shadow: 0 12px 24px rgba(37, 99, 235, 0.25);
+}
+
+.btn.secondary {
+    background: var(--card-muted);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+.btn.danger {
+    background: linear-gradient(120deg, #ef4444, #dc2626);
+    color: #fff;
+    box-shadow: 0 12px 20px rgba(220, 38, 38, 0.2);
 }
 
 .btn.ghost {
     background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid var(--border);
     color: var(--text);
+}
+
+.btn.ghost.danger {
+    color: var(--danger);
+    border-color: rgba(220, 38, 38, 0.4);
 }
 
 .cards {
@@ -239,11 +280,11 @@ body {
 }
 
 .card {
-    background: var(--card-muted);
+    background: var(--card);
     border-radius: 16px;
     padding: 1.5rem;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border);
+    box-shadow: 0 15px 35px rgba(15, 23, 42, 0.08);
 }
 
 .messages {
@@ -257,13 +298,15 @@ body {
 }
 
 .message.success {
-    background: rgba(71, 209, 108, 0.1);
-    border: 1px solid rgba(71, 209, 108, 0.3);
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.4);
+    color: #166534;
 }
 
 .message.error {
-    background: rgba(255, 107, 107, 0.1);
-    border: 1px solid rgba(255, 107, 107, 0.3);
+    background: rgba(248, 113, 113, 0.12);
+    border: 1px solid rgba(248, 113, 113, 0.4);
+    color: #991b1b;
 }
 
 form {
@@ -282,6 +325,10 @@ form {
     flex-direction: column;
 }
 
+.form-control.compact label {
+    font-size: 0.8rem;
+}
+
 .form-control label,
 label {
     display: block;
@@ -294,16 +341,16 @@ input, select, textarea {
     width: 100%;
     padding: 0.6rem 0.8rem;
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border);
+    background: #fff;
     color: var(--text);
 }
 
 .formset-card {
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border);
     border-radius: 14px;
     padding: 1rem;
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--card);
 }
 
 .checkbox-inline {
@@ -318,9 +365,9 @@ input, select, textarea {
     margin: 0 auto;
     padding: 2rem;
     border-radius: 18px;
-    background: var(--card-muted);
+    background: var(--card);
     border: 1px solid var(--border);
-    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 30px 60px rgba(15, 23, 42, 0.1);
 }
 
 .auth-card h2 {
@@ -340,6 +387,39 @@ input, select, textarea {
 .error-text {
     color: var(--danger);
     font-size: 0.75rem;
+}
+
+.info-banner {
+    border-radius: 16px;
+    padding: 1rem 1.25rem;
+    background: rgba(37, 99, 235, 0.08);
+    border: 1px dashed rgba(37, 99, 235, 0.4);
+    color: var(--text);
+}
+
+.entry-form {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--card-muted);
+}
+
+.form-grid.compact {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.entry-actions,
+.line-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.inline-delete {
+    margin: 0;
 }
 
 @media (max-width: 900px) {

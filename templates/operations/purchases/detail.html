@@ -7,9 +7,15 @@
             <h2>{{ purchase.title }}</h2>
             <p class="muted">{{ purchase.description|default:'Sem descrição' }}</p>
         </div>
-        <div>
-            <a href="{% url 'operations:purchase_update' purchase.pk %}" class="btn ghost">Editar</a>
+        <div class="line-actions">
+            <a href="{% url 'operations:purchase_update' purchase.pk %}" class="btn secondary">Editar</a>
             <a href="{% url 'operations:sale_create' %}?purchase={{ purchase.pk }}" class="btn primary">Nova venda</a>
+            {% if user.is_superuser or user.role == 'ADMIN' or user.role == 'MANAGER' %}
+                <form method="post" action="{% url 'operations:purchase_delete' purchase.pk %}" class="inline-delete" onsubmit="return confirm('Esta ação é irreversível. Apagar compra?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn ghost danger">Apagar compra</button>
+                </form>
+            {% endif %}
         </div>
     </header>
     <div class="cards">
@@ -60,7 +66,34 @@
 </section>
 
 <section class="panel">
-    <h3>Participações</h3>
+    <header class="panel-header">
+        <div>
+            <h3>Participações</h3>
+            <p class="muted">Regista quem financiou esta compra.</p>
+        </div>
+    </header>
+    {% if user.is_superuser or user.role == 'ADMIN' or user.role == 'MANAGER' %}
+        <div class="entry-form">
+            <form method="post" action="{% url 'operations:purchase_contribution_create' purchase.pk %}">
+                {% csrf_token %}
+                {{ contribution_form.non_field_errors }}
+                <div class="form-grid compact">
+                    {% for field in contribution_form %}
+                        <div class="form-control compact">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% for error in field.errors %}
+                                <small class="error-text">{{ error }}</small>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="entry-actions">
+                    <button type="submit" class="btn primary">Adicionar participação</button>
+                </div>
+            </form>
+        </div>
+    {% endif %}
     {% if purchase.contributions.exists %}
         <div class="line-table">
             {% for contrib in purchase.contributions.all %}
@@ -87,6 +120,14 @@
                         <span class="muted">Pago em</span>
                         <p>{{ contrib.paid_on|date:"d/m/Y" }}</p>
                     </div>
+                    {% if user.is_superuser or user.role == 'ADMIN' or user.role == 'MANAGER' %}
+                        <div class="line-actions">
+                            <form method="post" action="{% url 'operations:purchase_contribution_delete' purchase.pk contrib.pk %}" class="inline-delete" onsubmit="return confirm('Remover esta participação?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn ghost danger">Eliminar</button>
+                            </form>
+                        </div>
+                    {% endif %}
                 </div>
             {% endfor %}
         </div>
@@ -96,7 +137,34 @@
 </section>
 
 <section class="panel">
-    <h3>Custos adicionais</h3>
+    <header class="panel-header">
+        <div>
+            <h3>Custos adicionais</h3>
+            <p class="muted">Lança despesas extra associadas à compra.</p>
+        </div>
+    </header>
+    {% if user.is_superuser or user.role == 'ADMIN' or user.role == 'MANAGER' %}
+        <div class="entry-form">
+            <form method="post" action="{% url 'operations:additional_cost_create' purchase.pk %}">
+                {% csrf_token %}
+                {{ cost_form.non_field_errors }}
+                <div class="form-grid compact">
+                    {% for field in cost_form %}
+                        <div class="form-control compact">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% for error in field.errors %}
+                                <small class="error-text">{{ error }}</small>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="entry-actions">
+                    <button type="submit" class="btn primary">Adicionar custo</button>
+                </div>
+            </form>
+        </div>
+    {% endif %}
     {% if purchase.additional_costs.exists %}
         <div class="line-table">
             {% for cost in purchase.additional_costs.all %}
@@ -115,6 +183,14 @@
                         <span class="muted">Incurrido em</span>
                         <p>{{ cost.incurred_on|date:"d/m/Y" }}</p>
                     </div>
+                    {% if user.is_superuser or user.role == 'ADMIN' or user.role == 'MANAGER' %}
+                        <div class="line-actions">
+                            <form method="post" action="{% url 'operations:additional_cost_delete' purchase.pk cost.pk %}" class="inline-delete" onsubmit="return confirm('Remover este custo?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn ghost danger">Eliminar</button>
+                            </form>
+                        </div>
+                    {% endif %}
                 </div>
             {% endfor %}
         </div>
@@ -125,41 +201,43 @@
 
 <section class="panel">
     <h3>Vendas associadas</h3>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Comprador</th>
-                <th>Quantidade</th>
-                <th>Preço unitário</th>
-                <th>Total</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for sale in purchase.sales.all %}
+    <div class="table-wrapper">
+        <table class="table">
+            <thead>
                 <tr>
-                    <td>{{ sale.buyer_name }}</td>
-                    <td>{{ sale.quantity }}</td>
-                    <td>{{ sale.unit_price }}</td>
-                    <td>{{ sale.total_price|floatformat:2 }}</td>
-                    <td>{{ sale.get_status_display }}</td>
+                    <th>Comprador</th>
+                    <th>Quantidade</th>
+                    <th>Preço unitário</th>
+                    <th>Total</th>
+                    <th>Status</th>
                 </tr>
-                {% if sale.payments.all %}
+            </thead>
+            <tbody>
+                {% for sale in purchase.sales.all %}
                     <tr>
-                        <td colspan="5">
-                            <strong>Pagamentos:</strong>
-                            <ul>
-                                {% for payment in sale.payments.all %}
-                                    <li>{{ payment.paid_on }} · {{ payment.amount|floatformat:2 }} € · {{ payment.get_method_display }} · Recebido por {{ payment.receiver }}</li>
-                                {% endfor %}
-                            </ul>
-                        </td>
+                        <td data-label="Comprador">{{ sale.buyer_name }}</td>
+                        <td data-label="Quantidade">{{ sale.quantity }}</td>
+                        <td data-label="Preço unitário">{{ sale.unit_price }}</td>
+                        <td data-label="Total">{{ sale.total_price|floatformat:2 }}</td>
+                        <td data-label="Status">{{ sale.get_status_display }}</td>
                     </tr>
-                {% endif %}
-            {% empty %}
-                <tr><td colspan="5" class="muted">Sem vendas registadas.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                    {% if sale.payments.all %}
+                        <tr>
+                            <td colspan="5">
+                                <strong>Pagamentos:</strong>
+                                <ul>
+                                    {% for payment in sale.payments.all %}
+                                        <li>{{ payment.paid_on|date:"d/m/Y" }} · {{ payment.amount|floatformat:2 }} € · {{ payment.get_method_display }} · Recebido por {{ payment.receiver }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </td>
+                        </tr>
+                    {% endif %}
+                {% empty %}
+                    <tr><td colspan="5" class="muted">Sem vendas registadas.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </section>
 {% endblock %}

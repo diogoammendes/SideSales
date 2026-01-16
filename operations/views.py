@@ -15,10 +15,10 @@ from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.edit import FormView
 
 from .forms import (
-    AdditionalCostFormSet,
+    AdditionalCostForm,
     LoginForm,
     PurchaseForm,
-    PurchaseContributionFormSet,
+    PurchaseContributionForm,
     SaleForm,
     SalePaymentFormSet,
     UserCreateForm,
@@ -72,7 +72,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 or Decimal('0')
             )
             invested_signal = (
-                Purchase.objects.filter(signal_paid_by=user).aggregate(total=Sum('signal_amount'))['total']
+                Purchase.objects.filter(signal_paid_by=user).aggregate(total=Sum('signal_amount_eur'))['total']
                 or Decimal('0')
             )
             invested = invested_contributions + invested_costs + invested_signal
@@ -132,6 +132,12 @@ class PurchaseDetailView(LoginRequiredMixin, DetailView):
             .all()
         )
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['contribution_form'] = PurchaseContributionForm()
+        context['cost_form'] = AdditionalCostForm()
+        return context
+
 
 class PurchaseCreateView(LoginRequiredMixin, RoleRequiredMixin, View):
     template_name = 'operations/purchases/form.html'
@@ -139,14 +145,11 @@ class PurchaseCreateView(LoginRequiredMixin, RoleRequiredMixin, View):
 
     def get(self, request):
         form = PurchaseForm()
-        contrib_formset, cost_formset = self._build_formsets()
         return render(
             request,
             self.template_name,
             {
                 'form': form,
-                'contribution_formset': contrib_formset,
-                'cost_formset': cost_formset,
                 'title': _('Nova Compra'),
                 'submit_label': _('Guardar Compra'),
             },
@@ -154,15 +157,8 @@ class PurchaseCreateView(LoginRequiredMixin, RoleRequiredMixin, View):
 
     def post(self, request):
         form = PurchaseForm(request.POST)
-        dummy_purchase = Purchase()
-        contrib_formset, cost_formset = self._build_formsets(data=request.POST, instance=dummy_purchase)
-        if all([form.is_valid(), contrib_formset.is_valid(), cost_formset.is_valid()]):
-            with transaction.atomic():
-                purchase = form.save()
-                contrib_formset.instance = purchase
-                cost_formset.instance = purchase
-                contrib_formset.save()
-                cost_formset.save()
+        if form.is_valid():
+            purchase = form.save()
             messages.success(request, _('Compra criada com sucesso.'))
             return redirect('operations:purchase_detail', pk=purchase.pk)
         messages.error(request, _('Por favor corrija os erros abaixo.'))
@@ -171,17 +167,10 @@ class PurchaseCreateView(LoginRequiredMixin, RoleRequiredMixin, View):
             self.template_name,
             {
                 'form': form,
-                'contribution_formset': contrib_formset,
-                'cost_formset': cost_formset,
                 'title': _('Nova Compra'),
                 'submit_label': _('Guardar Compra'),
             },
         )
-
-    def _build_formsets(self, data=None, instance=None):
-        contribution = PurchaseContributionFormSet(data=data, instance=instance, prefix='contrib')
-        costs = AdditionalCostFormSet(data=data, instance=instance, prefix='cost')
-        return contribution, costs
 
 
 class PurchaseUpdateView(LoginRequiredMixin, RoleRequiredMixin, View):
@@ -194,14 +183,11 @@ class PurchaseUpdateView(LoginRequiredMixin, RoleRequiredMixin, View):
 
     def get(self, request, pk):
         form = PurchaseForm(instance=self.purchase)
-        contrib_formset, cost_formset = self._build_formsets(instance=self.purchase)
         return render(
             request,
             self.template_name,
             {
                 'form': form,
-                'contribution_formset': contrib_formset,
-                'cost_formset': cost_formset,
                 'title': _('Editar Compra'),
                 'submit_label': _('Atualizar Compra'),
             },
@@ -209,14 +195,8 @@ class PurchaseUpdateView(LoginRequiredMixin, RoleRequiredMixin, View):
 
     def post(self, request, pk):
         form = PurchaseForm(request.POST, instance=self.purchase)
-        contrib_formset, cost_formset = self._build_formsets(data=request.POST, instance=self.purchase)
-        if all([form.is_valid(), contrib_formset.is_valid(), cost_formset.is_valid()]):
-            with transaction.atomic():
-                purchase = form.save()
-                contrib_formset.instance = purchase
-                cost_formset.instance = purchase
-                contrib_formset.save()
-                cost_formset.save()
+        if form.is_valid():
+            purchase = form.save()
             messages.success(request, _('Compra atualizada.'))
             return redirect('operations:purchase_detail', pk=purchase.pk)
         messages.error(request, _('Por favor corrija os erros abaixo.'))
@@ -225,17 +205,74 @@ class PurchaseUpdateView(LoginRequiredMixin, RoleRequiredMixin, View):
             self.template_name,
             {
                 'form': form,
-                'contribution_formset': contrib_formset,
-                'cost_formset': cost_formset,
                 'title': _('Editar Compra'),
                 'submit_label': _('Atualizar Compra'),
             },
         )
 
-    def _build_formsets(self, data=None, instance=None):
-        contribution = PurchaseContributionFormSet(data=data, instance=instance, prefix='contrib')
-        costs = AdditionalCostFormSet(data=data, instance=instance, prefix='cost')
-        return contribution, costs
+
+class PurchaseDeleteView(LoginRequiredMixin, RoleRequiredMixin, View):
+    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
+
+    def post(self, request, pk):
+        purchase = get_object_or_404(Purchase, pk=pk)
+        purchase.delete()
+        messages.success(request, _('Compra eliminada.'))
+        return redirect('operations:purchase_list')
+
+
+class PurchaseContributionCreateView(LoginRequiredMixin, RoleRequiredMixin, View):
+    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
+
+    def post(self, request, pk):
+        purchase = get_object_or_404(Purchase, pk=pk)
+        form = PurchaseContributionForm(request.POST)
+        if form.is_valid():
+            contribution = form.save(commit=False)
+            contribution.purchase = purchase
+            contribution.save()
+            messages.success(request, _('Participação adicionada.'))
+        else:
+            for error in form.errors.values():
+                messages.error(request, error)
+        return redirect('operations:purchase_detail', pk=pk)
+
+
+class PurchaseContributionDeleteView(LoginRequiredMixin, RoleRequiredMixin, View):
+    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
+
+    def post(self, request, pk, contribution_pk):
+        contribution = get_object_or_404(PurchaseContribution, pk=contribution_pk, purchase_id=pk)
+        contribution.delete()
+        messages.success(request, _('Participação removida.'))
+        return redirect('operations:purchase_detail', pk=pk)
+
+
+class AdditionalCostCreateView(LoginRequiredMixin, RoleRequiredMixin, View):
+    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
+
+    def post(self, request, pk):
+        purchase = get_object_or_404(Purchase, pk=pk)
+        form = AdditionalCostForm(request.POST)
+        if form.is_valid():
+            cost = form.save(commit=False)
+            cost.purchase = purchase
+            cost.save()
+            messages.success(request, _('Custo adicional registado.'))
+        else:
+            for error in form.errors.values():
+                messages.error(request, error)
+        return redirect('operations:purchase_detail', pk=pk)
+
+
+class AdditionalCostDeleteView(LoginRequiredMixin, RoleRequiredMixin, View):
+    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
+
+    def post(self, request, pk, cost_pk):
+        cost = get_object_or_404(AdditionalCost, pk=cost_pk, purchase_id=pk)
+        cost.delete()
+        messages.success(request, _('Custo adicional removido.'))
+        return redirect('operations:purchase_detail', pk=pk)
 
 
 class SaleListView(LoginRequiredMixin, ListView):
