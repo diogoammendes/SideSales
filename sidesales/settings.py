@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 import dj_database_url
 
@@ -33,7 +34,7 @@ def _split_env_list(value: str) -> list[str]:
 
 
 def _normalize_host(host: str) -> str:
-    cleaned = host.strip().replace('https://', '').replace('http://', '')
+    cleaned = host.strip().replace('\\', '/').replace('https://', '').replace('http://', '')
     if not cleaned:
         return ''
     return cleaned.split('/')[0]
@@ -54,6 +55,14 @@ CSRF_TRUSTED_ORIGINS_ENV = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
 CSRF_TRUSTED_ORIGINS = [
     origin for origin in (_normalize_origin(item) for item in _split_env_list(CSRF_TRUSTED_ORIGINS_ENV)) if origin
 ]
+
+ALLOWED_HOSTS = sorted(
+    {
+        *ALLOWED_HOSTS,
+        *(urlparse(origin).hostname or '' for origin in CSRF_TRUSTED_ORIGINS),
+    }
+)
+ALLOWED_HOSTS = [host for host in ALLOWED_HOSTS if host]
 
 
 # Application definition
