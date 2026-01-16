@@ -8,6 +8,7 @@
     </div>
     <a href="{% url 'operations:sale_create' %}" class="btn primary">Nova venda</a>
 </header>
+<div class="table-wrapper">
 <table class="table">
     <thead>
         <tr>
@@ -23,15 +24,15 @@
     <tbody>
         {% for sale in sales %}
             <tr>
-                <td>{{ sale.purchase.title }}</td>
-                <td>
+                <td data-label="Compra">{{ sale.purchase.title }}</td>
+                <td data-label="Comprador">
                     <strong>{{ sale.buyer_name }}</strong><br>
                     <small class="muted">{{ sale.buyer_description|default:'-' }}</small>
                 </td>
-                <td>{{ sale.quantity }} @ {{ sale.unit_price }} €</td>
-                <td>{{ sale.total_price|floatformat:2 }} €</td>
-                <td>{{ sale.get_status_display }}</td>
-                <td>
+                <td data-label="Quantidade">{{ sale.quantity }} @ {{ sale.unit_price }} €</td>
+                <td data-label="Total">{{ sale.total_price|floatformat:2 }} €</td>
+                <td data-label="Status">{{ sale.get_status_display }}</td>
+                <td data-label="Pagamentos">
                     {% if sale.payments.all %}
                         {{ sale.payments.count }} registos<br>
                         <small class="muted">{{ sale.total_payments|floatformat:2 }} € recebidos<br>
@@ -43,7 +44,7 @@
                         <span class="muted">Sem pagamentos</span>
                     {% endif %}
                 </td>
-                <td><a href="{% url 'operations:sale_update' sale.pk %}">editar</a></td>
+                <td data-label="Ações"><a href="{% url 'operations:sale_update' sale.pk %}">editar</a></td>
             </tr>
         {% empty %}
             <tr>
@@ -52,4 +53,5 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% endblock %}

@@ -24,6 +24,7 @@
         </div>
         <a href="{% url 'operations:purchase_create' %}" class="btn primary">Nova compra</a>
     </header>
+    <div class="table-wrapper">
     <table class="table">
         <thead>
             <tr>
@@ -37,14 +38,14 @@
         <tbody>
             {% for purchase in purchases %}
                 <tr>
-                    <td>
+                    <td data-label="Compra">
                         <strong>{{ purchase.title }}</strong><br>
                         <small class="muted">{{ purchase.purchased_on }}</small>
                     </td>
-                    <td>{{ purchase.total_cost|floatformat:2 }} €</td>
-                    <td>{{ purchase.total_revenue|floatformat:2 }} €</td>
-                    <td class="{% if purchase.total_profit < 0 %}text-danger{% else %}text-success{% endif %}">{{ purchase.total_profit|floatformat:2 }} €</td>
-                    <td><a href="{% url 'operations:purchase_detail' purchase.pk %}">ver</a></td>
+                    <td data-label="Investimento">{{ purchase.total_cost|floatformat:2 }} €</td>
+                    <td data-label="Receita">{{ purchase.total_revenue|floatformat:2 }} €</td>
+                    <td data-label="Resultado" class="{% if purchase.total_profit < 0 %}text-danger{% else %}text-success{% endif %}">{{ purchase.total_profit|floatformat:2 }} €</td>
+                    <td data-label="Ações"><a href="{% url 'operations:purchase_detail' purchase.pk %}">ver</a></td>
                 </tr>
             {% empty %}
                 <tr>
@@ -53,6 +54,7 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
 </section>
 
 <section class="panel">
@@ -62,6 +64,7 @@
             <p class="muted">Investimentos vs recebimentos</p>
         </div>
     </header>
+    <div class="table-wrapper">
     <table class="table">
         <thead>
             <tr>
@@ -74,13 +77,13 @@
         <tbody>
             {% for entry in ledger %}
                 <tr>
-                    <td>
+                    <td data-label="Utilizador">
                         <strong>{{ entry.user.get_full_name|default:entry.user.username }}</strong>
                         <small class="muted">{{ entry.user.display_role }}</small>
                     </td>
-                    <td>{{ entry.invested|floatformat:2 }} €</td>
-                    <td>{{ entry.received|floatformat:2 }} €</td>
-                    <td class="{% if entry.net < 0 %}text-danger{% else %}text-success{% endif %}">{{ entry.net|floatformat:2 }} €</td>
+                    <td data-label="Investido">{{ entry.invested|floatformat:2 }} €</td>
+                    <td data-label="Recebido">{{ entry.received|floatformat:2 }} €</td>
+                    <td data-label="Saldo" class="{% if entry.net < 0 %}text-danger{% else %}text-success{% endif %}">{{ entry.net|floatformat:2 }} €</td>
                 </tr>
             {% empty %}
                 <tr>
@@ -89,5 +92,6 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
 </section>
 {% endblock %}

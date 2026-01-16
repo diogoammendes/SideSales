@@ -13,21 +13,31 @@
 <body>
     <div class="app-shell">
         <header class="app-header">
-            <div>
-                <h1>SideSales</h1>
-                <p>Gestão integrada de compras e vendas.</p>
+            <div class="app-brand">
+                {% if user.is_authenticated %}
+                    <button id="navToggle" class="nav-toggle" type="button" aria-controls="sidebar" aria-expanded="false">
+                        <span class="sr-only">Alternar menu</span>
+                        <span class="nav-toggle-bar"></span>
+                    </button>
+                {% endif %}
+                <div>
+                    <h1>SideSales</h1>
+                    <p>Gestão integrada de compras e vendas.</p>
+                </div>
             </div>
             {% if user.is_authenticated %}
                 <div class="user-menu">
-                    <span>{{ user.get_full_name|default:user.username }}</span>
-                    <small>{{ user.display_role|default:'' }}</small>
+                    <div>
+                        <span>{{ user.get_full_name|default:user.username }}</span>
+                        <small>{{ user.display_role|default:'' }}</small>
+                    </div>
                     <a href="{% url 'logout' %}" class="btn ghost">Terminar sessão</a>
                 </div>
             {% endif %}
         </header>
-        <div class="layout">
+        <div class="layout {% if not user.is_authenticated %}no-sidebar{% endif %}">
             {% if user.is_authenticated %}
-                <nav class="sidebar">
+                <nav class="sidebar" id="sidebar">
                     <a href="{% url 'operations:dashboard' %}" class="nav-link">Dashboard</a>
                     <div class="nav-group">
                         <span>Compras</span>
@@ -60,5 +70,19 @@
             </main>
         </div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const toggle = document.getElementById('navToggle');
+            const layout = document.querySelector('.layout');
+            if (!toggle || !layout) {
+                return;
+            }
+            toggle.addEventListener('click', function () {
+                layout.classList.toggle('sidebar-open');
+                const expanded = this.getAttribute('aria-expanded') === 'true';
+                this.setAttribute('aria-expanded', (!expanded).toString());
+            });
+        });
+    </script>
 </body>
 </html>
