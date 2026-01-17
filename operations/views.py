@@ -62,9 +62,11 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         purchases = Purchase.objects.prefetch_related(
             'additional_costs__paid_by', 'contributions__payer', 'sales'
         )
+        sales_summary = {
+            'realized': {'value': Decimal('0'), 'profit': Decimal('0'), 'count': 0},
+            'draft': {'value': Decimal('0'), 'profit': Decimal('0'), 'count': 0},
+        }
         total_invested = sum(p.total_cost for p in purchases)
-        total_revenue = sum(p.total_revenue for p in purchases)
-        total_profit = total_revenue - total_invested
 
         ledger_map: dict[int, dict[str, Decimal | User]] = defaultdict(
             lambda: {
@@ -81,6 +83,23 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         for purchase in purchases:
             purchase_investments: dict[int, Decimal] = defaultdict(Decimal)
+            per_unit_cost = Decimal('0')
+            if purchase.quantity:
+                per_unit_cost = (purchase.total_cost or Decimal('0')) / purchase.quantity
+            purchase_realized_revenue = Decimal('0')
+
+            for sale in purchase.sales.all():
+                sale_value = sale.total_price
+                sale_quantity = sale.quantity or Decimal('0')
+                sale_cost = sale_quantity * per_unit_cost
+                sale_profit = sale_value - sale_cost
+                bucket = 'draft' if sale.status == Sale.SaleStatus.DRAFT else 'realized'
+                summary = sales_summary[bucket]
+                summary['value'] += sale_value
+                summary['profit'] += sale_profit
+                summary['count'] += 1
+                if bucket == 'realized':
+                    purchase_realized_revenue += sale_value
 
             for contribution in purchase.contributions.all():
                 if contribution.payer_id:
@@ -94,7 +113,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 purchase_investments[purchase.signal_paid_by_id] += purchase.signal_amount_eur or Decimal('0')
 
             purchase_total_invested = sum(purchase_investments.values())
-            purchase_revenue = purchase.total_revenue
+            purchase_revenue = purchase_realized_revenue
 
             if not purchase_investments:
                 continue
@@ -134,6 +153,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 }
             )
 
+        total_revenue = sales_summary['realized']['value']
+        total_profit = sales_summary['realized']['profit']
+
         context.update(
             {
                 'purchases': purchases,
@@ -142,6 +164,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                     'revenue': total_revenue,
                     'profit': total_profit,
                 },
+                'sales_summary': sales_summary,
                 'ledger': ledger,
             }
         )

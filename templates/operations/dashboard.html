@@ -16,6 +16,19 @@
     </article>
 </section>
 
+<section class="cards">
+    <article class="card">
+        <span class="muted">Vendas Realizadas</span>
+        <h2>{{ sales_summary.realized.value|default:0|floatformat:2 }} €</h2>
+        <p class="muted">{{ sales_summary.realized.count }} vendas · lucro {{ sales_summary.realized.profit|default:0|floatformat:2 }} €</p>
+    </article>
+    <article class="card">
+        <span class="muted">Rascunhos em Pipeline</span>
+        <h2>{{ sales_summary.draft.value|default:0|floatformat:2 }} €</h2>
+        <p class="muted">{{ sales_summary.draft.count }} vendas · lucro potencial {{ sales_summary.draft.profit|default:0|floatformat:2 }} €</p>
+    </article>
+</section>
+
 <section class="panel">
     <header class="panel-header">
         <div>
