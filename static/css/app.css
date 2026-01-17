@@ -309,6 +309,136 @@ body {
     color: #991b1b;
 }
 
+.dashboard-hero {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.5rem;
+    align-items: stretch;
+    margin-bottom: 2rem;
+}
+
+.hero-copy {
+    background: linear-gradient(135deg, #0f172a, #1d4ed8);
+    color: #f8fafc;
+    border-radius: 24px;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    box-shadow: 0 30px 60px rgba(15, 23, 42, 0.45);
+}
+
+.hero-copy .muted {
+    color: rgba(248, 250, 252, 0.8);
+}
+
+.hero-copy .btn.primary {
+    align-self: flex-start;
+    background: rgba(248, 250, 252, 0.12);
+    color: #f8fafc;
+    border: 1px solid rgba(248, 250, 252, 0.4);
+    box-shadow: none;
+}
+
+.hero-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.metric-card {
+    border-radius: 20px;
+    padding: 1.5rem;
+    border: 1px solid rgba(248, 250, 252, 0.2);
+    background: rgba(248, 250, 252, 0.9);
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.metric-card .label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.metric-card .value {
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+
+.metric-card.highlight {
+    background: linear-gradient(140deg, #dbeafe, #eff6ff);
+    border-color: rgba(37, 99, 235, 0.25);
+}
+
+.pipeline {
+    margin-bottom: 2rem;
+}
+
+.pipeline-card {
+    border-radius: 24px;
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+    background: var(--card);
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+}
+
+.pipeline-progress {
+    height: 12px;
+    background: var(--bg-soft);
+    border-radius: 999px;
+    margin: 1.5rem 0;
+    overflow: hidden;
+}
+
+.pipeline-progress .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+    border-radius: inherit;
+    transition: width 0.4s ease;
+    width: var(--progress, 0%);
+}
+
+.pipeline-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    align-items: center;
+}
+
+.pipeline-col .label {
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+}
+
+.pipeline-col strong {
+    font-size: 1.8rem;
+    display: block;
+    margin: 0.25rem 0;
+}
+
+.pipeline-divider {
+    width: 1px;
+    height: 80px;
+    background: var(--border);
+    justify-self: center;
+}
+
+.panel-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+
+.panel-card {
+    height: 100%;
+}
+
 form {
     display: grid;
     gap: 1rem;

@@ -158,6 +158,15 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         projected_revenue = total_revenue + sales_summary['draft']['value']
         projected_profit = projected_revenue - total_invested
 
+        pipeline_total = projected_revenue
+        if pipeline_total > 0:
+            realized_share = (total_revenue / pipeline_total) * Decimal('100')
+        else:
+            realized_share = Decimal('0')
+        draft_share = Decimal('100') - realized_share if pipeline_total > 0 else Decimal('0')
+        sales_summary['realized']['share'] = realized_share
+        sales_summary['draft']['share'] = draft_share
+
         context.update(
             {
                 'purchases': purchases,
