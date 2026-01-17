@@ -154,9 +154,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             )
 
         total_revenue = sales_summary['realized']['value']
-        total_profit = sales_summary['realized']['profit']
+        total_profit = total_revenue - total_invested
         projected_revenue = total_revenue + sales_summary['draft']['value']
-        projected_profit = total_profit + sales_summary['draft']['profit']
+        projected_profit = projected_revenue - total_invested
 
         context.update(
             {
