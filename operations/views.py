@@ -155,6 +155,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         total_revenue = sales_summary['realized']['value']
         total_profit = sales_summary['realized']['profit']
+        projected_revenue = total_revenue + sales_summary['draft']['value']
+        projected_profit = total_profit + sales_summary['draft']['profit']
 
         context.update(
             {
@@ -163,6 +165,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                     'invested': total_invested,
                     'revenue': total_revenue,
                     'profit': total_profit,
+                },
+                'projections': {
+                    'revenue': projected_revenue,
+                    'profit': projected_profit,
                 },
                 'sales_summary': sales_summary,
                 'ledger': ledger,
