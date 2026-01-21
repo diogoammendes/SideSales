@@ -1,0 +1,21 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7dd3fc" />
+      <stop offset="100%" stop-color="#93c5fd" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="rgba(15,23,42,0.35)" />
+    </filter>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#bg)" />
+  <g filter="url(#shadow)">
+    <path d="M64 110c0-33 25-58 65-58 33 0 54 14 65 31l-26 18c-8-12-19-21-39-21-23 0-36 13-36 29 0 17 12 28 36 28h22v28h-24c-42 0-63-23-63-57z" fill="white"/>
+    <path d="M192 146c0 33-25 58-65 58-31 0-55-12-69-35l27-17c9 14 21 23 42 23 24 0 36-13 36-29 0-18-12-28-36-28h-22v-28h24c42 0 63 23 63 56z" fill="url(#accent)"/>
+  </g>
+  <circle cx="208" cy="48" r="18" fill="#fcd34d" opacity="0.85" />
+</svg>
