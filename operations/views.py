@@ -2,7 +2,7 @@ from collections import defaultdict
 from decimal import Decimal
 
 from django.contrib import messages
-from django.contrib.auth import logout
+from django.contrib.auth import logout, update_session_auth_hash
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.forms import AuthenticationForm, SetPasswordForm, UserCreationForm
 from django.contrib.auth.views import LoginView as AuthLoginView
@@ -572,6 +572,8 @@ class UserPasswordUpdateView(LoginRequiredMixin, RoleRequiredMixin, View):
         form = SetPasswordForm(user=self.user_obj, data=request.POST)
         if form.is_valid():
             form.save()
+            if request.user == self.user_obj:
+                update_session_auth_hash(request, self.user_obj)
             messages.success(request, _('Password atualizada para %(user)s.') % {'user': self.user_obj.get_full_name() or self.user_obj.username})
             return redirect('operations:user_list')
         messages.error(request, _('Por favor corrija os erros abaixo.'))
