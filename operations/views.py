@@ -522,6 +522,25 @@ class UserUpdateView(LoginRequiredMixin, RoleRequiredMixin, View):
             self.template_name,
             {
                 'form': form,
+                'user_obj': self.user_obj,
+                'title': _('Editar Utilizador'),
+                'submit_label': _('Atualizar Utilizador'),
+            },
+        )
+
+    def post(self, request, pk):
+        form = UserUpdateForm(request.POST, instance=self.user_obj)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _('Utilizador %(user)s atualizado.') % {'user': self.user_obj.get_full_name() or self.user_obj.username})
+            return redirect('operations:user_list')
+        messages.error(request, _('Por favor corrija os erros abaixo.'))
+        return render(
+            request,
+            self.template_name,
+            {
+                'form': form,
+                'user_obj': self.user_obj,
                 'title': _('Editar Utilizador'),
                 'submit_label': _('Atualizar Utilizador'),
             },
