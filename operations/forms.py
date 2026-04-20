@@ -1,7 +1,11 @@
+from decimal import Decimal
+
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from django.db.models import Q
 from django.forms import inlineformset_factory
+from django.utils.translation import gettext_lazy as _
 
 from .models import (
     AdditionalCost,
@@ -13,9 +17,19 @@ from .models import (
 )
 
 
+def _active_users_including(instance_user_id: int | None):
+    """Return active users, plus the (possibly deactivated) user currently
+    selected on the instance being edited, so we never silently drop the
+    historical value."""
+    qs = User.objects.filter(is_active=True)
+    if instance_user_id:
+        qs = User.objects.filter(Q(is_active=True) | Q(pk=instance_user_id))
+    return qs.order_by('first_name', 'username')
+
+
 class LoginForm(AuthenticationForm):
-    username = forms.CharField(label='Utilizador')
-    password = forms.CharField(widget=forms.PasswordInput, label='Password')
+    username = forms.CharField(label=_('Utilizador'))
+    password = forms.CharField(widget=forms.PasswordInput, label=_('Password'))
 
 
 class PurchaseForm(forms.ModelForm):
@@ -43,7 +57,8 @@ class PurchaseForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if 'signal_paid_by' in self.fields:
-            self.fields['signal_paid_by'].queryset = User.objects.filter(is_active=True)
+            current = getattr(self.instance, 'signal_paid_by_id', None)
+            self.fields['signal_paid_by'].queryset = _active_users_including(current)
 
 
 class PurchaseContributionForm(forms.ModelForm):
@@ -55,7 +70,22 @@ class PurchaseContributionForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if 'payer' in self.fields:
-            self.fields['payer'].queryset = User.objects.filter(is_active=True)
+            current = getattr(self.instance, 'payer_id', None)
+            self.fields['payer'].queryset = _active_users_including(current)
+
+    def clean(self):
+        cleaned = super().clean()
+        contribution_type = cleaned.get('contribution_type')
+        value = cleaned.get('value')
+        if value is not None and value < 0:
+            self.add_error('value', _('Valor não pode ser negativo.'))
+        if (
+            contribution_type == PurchaseContribution.ContributionType.PERCENTAGE
+            and value is not None
+            and (value < 0 or value > Decimal('100'))
+        ):
+            self.add_error('value', _('Percentagem tem de estar entre 0 e 100.'))
+        return cleaned
 
 
 class AdditionalCostForm(forms.ModelForm):
@@ -67,7 +97,14 @@ class AdditionalCostForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if 'paid_by' in self.fields:
-            self.fields['paid_by'].queryset = User.objects.filter(is_active=True)
+            current = getattr(self.instance, 'paid_by_id', None)
+            self.fields['paid_by'].queryset = _active_users_including(current)
+
+    def clean_amount(self):
+        amount = self.cleaned_data.get('amount')
+        if amount is not None and amount < 0:
+            raise forms.ValidationError(_('Montante não pode ser negativo.'))
+        return amount
 
 
 class SaleForm(forms.ModelForm):
@@ -85,6 +122,26 @@ class SaleForm(forms.ModelForm):
         ]
         widgets = {'sold_on': forms.DateInput(attrs={'type': 'date'})}
 
+    def clean(self):
+        cleaned = super().clean()
+        quantity = cleaned.get('quantity')
+        unit_price = cleaned.get('unit_price')
+        if quantity is not None and quantity <= 0:
+            self.add_error('quantity', _('Quantidade tem de ser maior que zero.'))
+        if unit_price is not None and unit_price < 0:
+            self.add_error('unit_price', _('Preço unitário não pode ser negativo.'))
+
+        # Delegate overselling check to model.clean().
+        instance = self.instance
+        instance.purchase = cleaned.get('purchase', instance.purchase_id and instance.purchase)
+        instance.quantity = quantity
+        instance.status = cleaned.get('status', instance.status)
+        try:
+            instance.clean()
+        except forms.ValidationError as exc:
+            self._update_errors(exc)
+        return cleaned
+
 
 class SalePaymentForm(forms.ModelForm):
     class Meta:
@@ -95,7 +152,14 @@ class SalePaymentForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if 'receiver' in self.fields:
-            self.fields['receiver'].queryset = User.objects.filter(is_active=True)
+            current = getattr(self.instance, 'receiver_id', None)
+            self.fields['receiver'].queryset = _active_users_including(current)
+
+    def clean_amount(self):
+        amount = self.cleaned_data.get('amount')
+        if amount is None or amount <= 0:
+            raise forms.ValidationError(_('Montante tem de ser maior que zero.'))
+        return amount
 
 
 PurchaseContributionFormSet = inlineformset_factory(
@@ -124,14 +188,64 @@ SalePaymentFormSet = inlineformset_factory(
 
 
 class UserCreateForm(UserCreationForm):
-    role = forms.ChoiceField(choices=User.Roles.choices, label='Perfil')
+    role = forms.ChoiceField(choices=User.Roles.choices, label=_('Perfil'))
 
     class Meta(UserCreationForm.Meta):
         model = User
         fields = ('username', 'email', 'first_name', 'last_name', 'role')
 
+    def clean_email(self):
+        email = (self.cleaned_data.get('email') or '').strip()
+        if email and User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError(_('Já existe um utilizador com este email.'))
+        return email
+
 
 class UserUpdateForm(forms.ModelForm):
+    """Role and is_active are intentionally controlled at the view layer to
+    prevent self-demotion and privilege escalation; see UserUpdateView."""
+
     class Meta:
         model = get_user_model()
         fields = ('email', 'first_name', 'last_name', 'role', 'is_active')
+
+    def __init__(self, *args, editor=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._editor = editor
+
+    def clean_email(self):
+        email = (self.cleaned_data.get('email') or '').strip()
+        if email:
+            qs = get_user_model().objects.filter(email__iexact=email)
+            if self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError(_('Já existe um utilizador com este email.'))
+        return email
+
+    def clean(self):
+        cleaned = super().clean()
+        editor = self._editor
+        target = self.instance
+        if editor is None or target.pk is None:
+            return cleaned
+
+        is_self = editor.pk == target.pk
+        role = cleaned.get('role')
+        is_active = cleaned.get('is_active')
+
+        # Never allow modifying superusers unless the editor is also a superuser.
+        if target.is_superuser and not editor.is_superuser:
+            raise forms.ValidationError(
+                _('Não é possível modificar uma conta de super-utilizador.')
+            )
+
+        # Never allow self-demotion or self-deactivation; the only admin could
+        # otherwise lock themselves out.
+        if is_self:
+            if role and role != target.role:
+                self.add_error('role', _('Não pode alterar o seu próprio perfil.'))
+            if is_active is False:
+                self.add_error('is_active', _('Não pode desativar a sua própria conta.'))
+
+        return cleaned
