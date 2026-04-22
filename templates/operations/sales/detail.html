@@ -17,6 +17,12 @@
         <div class="line-actions">
             <a href="{% url 'operations:sale_update' sale.pk %}" class="btn secondary">Editar venda</a>
             <a href="{% url 'operations:sale_list' %}" class="btn ghost">Voltar à lista</a>
+            {% if user.is_superuser or user.role == 'ADMIN' or user.role == 'MANAGER' %}
+                <form method="post" action="{% url 'operations:sale_delete' sale.pk %}" class="inline-delete" onsubmit="return confirm('Esta ação é irreversível. Apagar venda?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn ghost danger"{% if sale.payments.exists %} disabled title="Remova primeiro os pagamentos associados."{% endif %}>Apagar venda</button>
+                </form>
+            {% endif %}
         </div>
     </header>
     <div class="cards">
