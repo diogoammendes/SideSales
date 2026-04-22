@@ -217,6 +217,58 @@ class PrivilegeEscalationTests(BaseFinanceTest):
         self.assertEqual(response.status_code, 403)
 
 
+class SaleDeleteTests(BaseFinanceTest):
+    def _sale_without_payments(self) -> Sale:
+        purchase = Purchase.objects.create(
+            title='P', quantity=Decimal('2'), total_amount_eur=Decimal('100'),
+        )
+        return Sale.objects.create(
+            purchase=purchase,
+            buyer_name='B',
+            quantity=Decimal('1'),
+            unit_price=Decimal('50'),
+            status=Sale.SaleStatus.DRAFT,
+        )
+
+    def test_manager_can_delete_sale_without_payments(self):
+        sale = self._sale_without_payments()
+        purchase_pk = sale.purchase_id
+        self.client.login(username='manager', password='pw')
+        response = self.client.post(
+            reverse('operations:sale_delete', kwargs={'pk': sale.pk})
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Sale.objects.filter(pk=sale.pk).exists())
+        self.assertEqual(
+            response.url,
+            reverse('operations:purchase_detail', kwargs={'pk': purchase_pk}),
+        )
+
+    def test_sale_with_payments_cannot_be_deleted(self):
+        sale = self._sale_without_payments()
+        SalePayment.objects.create(
+            sale=sale,
+            receiver=self.manager,
+            amount=Decimal('10'),
+            method=SalePayment.PaymentMethod.CASH,
+        )
+        self.client.login(username='admin', password='pw')
+        response = self.client.post(
+            reverse('operations:sale_delete', kwargs={'pk': sale.pk})
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Sale.objects.filter(pk=sale.pk).exists())
+
+    def test_viewer_cannot_delete_sale(self):
+        sale = self._sale_without_payments()
+        self.client.login(username='viewer', password='pw')
+        response = self.client.post(
+            reverse('operations:sale_delete', kwargs={'pk': sale.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Sale.objects.filter(pk=sale.pk).exists())
+
+
 class PurchaseDeleteProtectionTests(BaseFinanceTest):
     def test_purchase_with_payments_cannot_be_deleted(self):
         purchase = Purchase.objects.create(

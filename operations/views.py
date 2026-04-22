@@ -563,6 +563,36 @@ class SaleUpdateView(LoginRequiredMixin, RoleRequiredMixin, _FormPageMixin, View
         return self.render_form(request, form)
 
 
+class SaleDeleteView(LoginRequiredMixin, RoleRequiredMixin, View):
+    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
+
+    @transaction.atomic
+    def post(self, request, pk):
+        sale = get_object_or_404(Sale, pk=pk)
+        purchase_pk = sale.purchase_id
+        # Refuse to destroy financial history: if payments were already
+        # recorded against this sale, force the operator to remove those
+        # first so the ledger stays auditable.
+        if sale.payments.exists():
+            messages.error(
+                request,
+                _('Não é possível apagar uma venda com pagamentos registados.'),
+            )
+            return redirect('operations:sale_detail', pk=sale.pk)
+        try:
+            sale.delete()
+        except ProtectedError:
+            messages.error(
+                request,
+                _('Não é possível apagar esta venda: existem registos protegidos.'),
+            )
+            return redirect('operations:sale_detail', pk=sale.pk)
+        messages.success(request, _('Venda eliminada.'))
+        if purchase_pk:
+            return redirect('operations:purchase_detail', pk=purchase_pk)
+        return redirect('operations:sale_list')
+
+
 class SalePaymentCreateView(LoginRequiredMixin, RoleRequiredMixin, View):
     required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
 
