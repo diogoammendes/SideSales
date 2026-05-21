@@ -6,15 +6,69 @@
     {% csrf_token %}
     {{ form.non_field_errors }}
     <div class="form-grid">
-        {% for field in form %}
-            <div class="form-control">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% for error in field.errors %}
-                    <small class="error-text">{{ error }}</small>
-                {% endfor %}
+
+        <div class="form-control">
+            <label for="{{ form.purchase.id_for_label }}">{{ form.purchase.label }}</label>
+            {{ form.purchase }}
+            {% for error in form.purchase.errors %}<small class="error-text">{{ error }}</small>{% endfor %}
+        </div>
+
+        <div class="form-control">
+            <label for="{{ form.buyer_name.id_for_label }}">{{ form.buyer_name.label }}</label>
+            {{ form.buyer_name }}
+            {% for error in form.buyer_name.errors %}<small class="error-text">{{ error }}</small>{% endfor %}
+        </div>
+
+        <div class="form-control">
+            <label for="{{ form.buyer_description.id_for_label }}">{{ form.buyer_description.label }}</label>
+            {{ form.buyer_description }}
+            {% for error in form.buyer_description.errors %}<small class="error-text">{{ error }}</small>{% endfor %}
+        </div>
+
+        <div class="form-control">
+            <label for="{{ form.quantity.id_for_label }}">{{ form.quantity.label }}</label>
+            {{ form.quantity }}
+            {% for error in form.quantity.errors %}<small class="error-text">{{ error }}</small>{% endfor %}
+        </div>
+
+        <div class="form-control">
+            <div class="price-toggle" role="group" aria-label="Modo de preço">
+                <button type="button" class="price-toggle-btn" data-mode="unit">Valor unitário</button>
+                <button type="button" class="price-toggle-btn" data-mode="total">Valor total</button>
             </div>
-        {% endfor %}
+            {{ form.price_mode }}
+
+            <div id="price-unit-field">
+                <label for="{{ form.unit_price.id_for_label }}">{{ form.unit_price.label }}</label>
+                {{ form.unit_price }}
+                {% for error in form.unit_price.errors %}<small class="error-text">{{ error }}</small>{% endfor %}
+            </div>
+
+            <div id="price-total-field">
+                <label for="{{ form.total_price_input.id_for_label }}">{{ form.total_price_input.label }}</label>
+                {{ form.total_price_input }}
+                {% for error in form.total_price_input.errors %}<small class="error-text">{{ error }}</small>{% endfor %}
+            </div>
+        </div>
+
+        <div class="form-control">
+            <label for="{{ form.sold_on.id_for_label }}">{{ form.sold_on.label }}</label>
+            {{ form.sold_on }}
+            {% for error in form.sold_on.errors %}<small class="error-text">{{ error }}</small>{% endfor %}
+        </div>
+
+        <div class="form-control">
+            <label for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
+            {{ form.status }}
+            {% for error in form.status.errors %}<small class="error-text">{{ error }}</small>{% endfor %}
+        </div>
+
+        <div class="form-control">
+            <label for="{{ form.notes.id_for_label }}">{{ form.notes.label }}</label>
+            {{ form.notes }}
+            {% for error in form.notes.errors %}<small class="error-text">{{ error }}</small>{% endfor %}
+        </div>
+
     </div>
 
     <div class="info-banner">
@@ -22,4 +76,29 @@
     </div>
     <button type="submit" class="btn primary">{{ submit_label }}</button>
 </form>
+
+<script>
+(function () {
+    const modeInput = document.querySelector('[name="{{ form.price_mode.html_name }}"]');
+    const unitField = document.getElementById('price-unit-field');
+    const totalField = document.getElementById('price-total-field');
+    const btns = document.querySelectorAll('.price-toggle-btn');
+
+    function applyMode(mode) {
+        btns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+        if (mode === 'total') {
+            unitField.style.display = 'none';
+            totalField.style.display = '';
+        } else {
+            unitField.style.display = '';
+            totalField.style.display = 'none';
+        }
+        if (modeInput) modeInput.value = mode;
+    }
+
+    btns.forEach(btn => btn.addEventListener('click', () => applyMode(btn.dataset.mode)));
+
+    applyMode((modeInput && modeInput.value) || 'unit');
+}());
+</script>
 {% endblock %}
