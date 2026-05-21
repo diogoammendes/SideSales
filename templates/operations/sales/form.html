@@ -40,13 +40,19 @@
 
             <div id="price-unit-field">
                 <label for="{{ form.unit_price.id_for_label }}">{{ form.unit_price.label }}</label>
-                {{ form.unit_price }}
+                <div class="input-currency">
+                    {{ form.unit_price }}
+                    <span class="currency-symbol">€</span>
+                </div>
                 {% for error in form.unit_price.errors %}<small class="error-text">{{ error }}</small>{% endfor %}
             </div>
 
             <div id="price-total-field">
                 <label for="{{ form.total_price_input.id_for_label }}">{{ form.total_price_input.label }}</label>
-                {{ form.total_price_input }}
+                <div class="input-currency">
+                    {{ form.total_price_input }}
+                    <span class="currency-symbol">€</span>
+                </div>
                 {% for error in form.total_price_input.errors %}<small class="error-text">{{ error }}</small>{% endfor %}
             </div>
         </div>

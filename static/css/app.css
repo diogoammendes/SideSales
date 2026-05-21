@@ -527,6 +527,25 @@ input, select, textarea {
     color: var(--text);
 }
 
+.input-currency {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-currency input {
+    padding-right: 2rem;
+    width: 100%;
+}
+
+.input-currency .currency-symbol {
+    position: absolute;
+    right: 0.75rem;
+    color: var(--text-muted);
+    pointer-events: none;
+    font-size: 0.9rem;
+}
+
 .price-toggle {
     display: inline-flex;
     border: 1px solid var(--border);

@@ -35,7 +35,13 @@
                     <strong>{{ sale.buyer_name }}</strong><br>
                     <small class="muted">{{ sale.buyer_description|default:'-' }}</small>
                 </td>
-                <td data-label="Quantidade">{{ sale.quantity }} @ {{ sale.unit_price }} €</td>
+                <td data-label="Quantidade">
+                    {% if sale.total_price_override is not None %}
+                        {{ sale.quantity|floatformat:2 }} unid.
+                    {% else %}
+                        {{ sale.quantity|floatformat:2 }} @ {{ sale.unit_price|floatformat:2 }} €
+                    {% endif %}
+                </td>
                 <td data-label="Total">{{ sale.total_price|floatformat:2 }} €</td>
                 <td data-label="Status">{{ sale.get_status_display }}</td>
                 <td data-label="Pagamentos">

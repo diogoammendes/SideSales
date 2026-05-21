@@ -29,7 +29,11 @@
         <article class="card">
             <span class="muted">Total da venda</span>
             <h3>{{ sale.total_price|floatformat:2 }} €</h3>
-            <small class="muted">{{ sale.quantity|floatformat:2 }} @ {{ sale.unit_price|floatformat:2 }} €</small>
+            {% if sale.total_price_override is not None %}
+                <small class="muted">{{ sale.quantity|floatformat:2 }} unid. · total fixo</small>
+            {% else %}
+                <small class="muted">{{ sale.quantity|floatformat:2 }} @ {{ sale.unit_price|floatformat:2 }} €</small>
+            {% endif %}
         </article>
         <article class="card">
             <span class="muted">Recebido</span>

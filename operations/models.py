@@ -233,6 +233,9 @@ class Sale(TimeStampedModel):
     buyer_description = models.TextField(blank=True)
     quantity = models.DecimalField(max_digits=12, decimal_places=2, validators=POSITIVE)
     unit_price = models.DecimalField(max_digits=12, decimal_places=2, validators=NON_NEGATIVE)
+    total_price_override = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True
+    )
     sold_on = models.DateField(default=timezone.now)
     status = models.CharField(max_length=20, choices=SaleStatus.choices, default=SaleStatus.DRAFT)
     notes = models.TextField(blank=True)
@@ -269,6 +272,8 @@ class Sale(TimeStampedModel):
 
     @property
     def total_price(self) -> Decimal:
+        if self.total_price_override is not None:
+            return self.total_price_override
         return (self.quantity or ZERO) * (self.unit_price or ZERO)
 
     @property

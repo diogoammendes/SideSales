@@ -140,6 +140,11 @@ class SaleForm(forms.ModelForm):
         # Field-level required is disabled; we validate in clean() so we can
         # control which field shows the error based on the selected price mode.
         self.fields['unit_price'].required = False
+        # When editing a sale that was saved with a total override, pre-fill
+        # the total field and activate total mode.
+        if self.instance.pk and self.instance.total_price_override is not None:
+            self.initial['total_price_input'] = self.instance.total_price_override
+            self.initial['price_mode'] = 'total'
 
     def clean(self):
         cleaned = super().clean()
@@ -178,6 +183,16 @@ class SaleForm(forms.ModelForm):
         except forms.ValidationError as exc:
             self._update_errors(exc)
         return cleaned
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if self.cleaned_data.get('price_mode') == 'total':
+            instance.total_price_override = self.cleaned_data.get('total_price_input')
+        else:
+            instance.total_price_override = None
+        if commit:
+            instance.save()
+        return instance
 
 
 class SalePaymentForm(forms.ModelForm):
