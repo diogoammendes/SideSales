@@ -82,6 +82,8 @@
     const modeInput = document.querySelector('[name="{{ form.price_mode.html_name }}"]');
     const unitField = document.getElementById('price-unit-field');
     const totalField = document.getElementById('price-total-field');
+    const unitInput = unitField.querySelector('input');
+    const totalInput = totalField.querySelector('input');
     const btns = document.querySelectorAll('.price-toggle-btn');
 
     function applyMode(mode) {
@@ -89,9 +91,13 @@
         if (mode === 'total') {
             unitField.style.display = 'none';
             totalField.style.display = '';
+            if (unitInput) unitInput.disabled = true;
+            if (totalInput) totalInput.disabled = false;
         } else {
             unitField.style.display = '';
             totalField.style.display = 'none';
+            if (unitInput) unitInput.disabled = false;
+            if (totalInput) totalInput.disabled = true;
         }
         if (modeInput) modeInput.value = mode;
     }

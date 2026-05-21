@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django import forms
 from django.contrib.auth import get_user_model
@@ -135,11 +135,16 @@ class SaleForm(forms.ModelForm):
         ]
         widgets = {'sold_on': forms.DateInput(attrs={'type': 'date'})}
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Field-level required is disabled; we validate in clean() so we can
+        # control which field shows the error based on the selected price mode.
+        self.fields['unit_price'].required = False
+
     def clean(self):
         cleaned = super().clean()
         quantity = cleaned.get('quantity')
         price_mode = cleaned.get('price_mode') or 'unit'
-        unit_price = cleaned.get('unit_price')
 
         if price_mode == 'total':
             total_price_input = cleaned.get('total_price_input')
@@ -148,12 +153,16 @@ class SaleForm(forms.ModelForm):
             elif total_price_input < 0:
                 self.add_error('total_price_input', _('Valor total não pode ser negativo.'))
             elif quantity and quantity > 0:
-                cleaned['unit_price'] = total_price_input / quantity
-                self.instance.unit_price = cleaned['unit_price']
-            elif quantity is not None and quantity <= 0:
-                pass  # quantity error handled below
+                unit_price = (total_price_input / quantity).quantize(
+                    Decimal('0.01'), rounding=ROUND_HALF_UP
+                )
+                cleaned['unit_price'] = unit_price
+                self.instance.unit_price = unit_price
         else:
-            if unit_price is not None and unit_price < 0:
+            unit_price = cleaned.get('unit_price')
+            if unit_price is None and 'unit_price' not in self.errors:
+                self.add_error('unit_price', _('Preço unitário é obrigatório.'))
+            elif unit_price is not None and unit_price < 0:
                 self.add_error('unit_price', _('Preço unitário não pode ser negativo.'))
 
         if quantity is not None and quantity <= 0:
