@@ -108,6 +108,19 @@ class AdditionalCostForm(forms.ModelForm):
 
 
 class SaleForm(forms.ModelForm):
+    price_mode = forms.CharField(
+        widget=forms.HiddenInput,
+        initial='unit',
+        required=False,
+    )
+    total_price_input = forms.DecimalField(
+        label=_('Valor total'),
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        widget=forms.NumberInput(attrs={'step': '0.01', 'min': '0'}),
+    )
+
     class Meta:
         model = Sale
         fields = [
@@ -125,11 +138,26 @@ class SaleForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
         quantity = cleaned.get('quantity')
+        price_mode = cleaned.get('price_mode') or 'unit'
         unit_price = cleaned.get('unit_price')
+
+        if price_mode == 'total':
+            total_price_input = cleaned.get('total_price_input')
+            if total_price_input is None:
+                self.add_error('total_price_input', _('Insere o valor total.'))
+            elif total_price_input < 0:
+                self.add_error('total_price_input', _('Valor total não pode ser negativo.'))
+            elif quantity and quantity > 0:
+                cleaned['unit_price'] = total_price_input / quantity
+                self.instance.unit_price = cleaned['unit_price']
+            elif quantity is not None and quantity <= 0:
+                pass  # quantity error handled below
+        else:
+            if unit_price is not None and unit_price < 0:
+                self.add_error('unit_price', _('Preço unitário não pode ser negativo.'))
+
         if quantity is not None and quantity <= 0:
             self.add_error('quantity', _('Quantidade tem de ser maior que zero.'))
-        if unit_price is not None and unit_price < 0:
-            self.add_error('unit_price', _('Preço unitário não pode ser negativo.'))
 
         # Delegate overselling check to model.clean().
         instance = self.instance
