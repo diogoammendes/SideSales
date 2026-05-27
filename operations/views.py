@@ -334,14 +334,16 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
         invested = invested_by_user.get(uid, ZERO)
         received = received_by_user.get(uid, ZERO)
         if total_invested > ZERO:
+            share_pct = (invested / total_invested) * Decimal('100')
             fair = (invested / total_invested) * total_received
         else:
+            share_pct = Decimal('100') / n_users
             fair = total_received / n_users
         balance = received - fair
         balances[uid] = {
             'invested': invested,
             'received': received,
-            'fair': fair,
+            'share_pct': share_pct,
             'balance': balance,
             'balance_abs': abs(balance),
         }

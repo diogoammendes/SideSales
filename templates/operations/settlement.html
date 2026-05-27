@@ -30,7 +30,9 @@
     <header class="panel-header">
         <div>
             <h3>Posição de cada utilizador</h3>
-            <p class="muted">Quota proporcional ao investimento vs. pagamentos efetivamente recebidos.</p>
+            <p class="muted">
+                O saldo indica quanto cada um recebeu a mais ou a menos face à sua quota de investimento.
+            </p>
         </div>
     </header>
     <div class="table-wrapper">
@@ -39,7 +41,6 @@
             <tr>
                 <th>Utilizador</th>
                 <th>Investido</th>
-                <th>Quota justa</th>
                 <th>Recebido</th>
                 <th>Saldo</th>
             </tr>
@@ -50,8 +51,10 @@
                     <td data-label="Utilizador">
                         <strong>{{ row.user.get_full_name|default:row.user.username }}</strong>
                     </td>
-                    <td data-label="Investido">{{ row.invested|floatformat:2 }} €</td>
-                    <td data-label="Quota justa">{{ row.fair|floatformat:2 }} €</td>
+                    <td data-label="Investido">
+                        {{ row.invested|floatformat:2 }} €
+                        <small class="muted">({{ row.share_pct|floatformat:1 }}% do total)</small>
+                    </td>
                     <td data-label="Recebido">{{ row.received|floatformat:2 }} €</td>
                     <td data-label="Saldo">
                         {% if row.balance > 0 %}
@@ -65,7 +68,7 @@
                 </tr>
             {% empty %}
                 <tr>
-                    <td colspan="5" class="muted">Sem movimentos registados.</td>
+                    <td colspan="4" class="muted">Sem movimentos registados.</td>
                 </tr>
             {% endfor %}
         </tbody>
