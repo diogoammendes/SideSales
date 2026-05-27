@@ -344,6 +344,7 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
             'invested': invested,
             'received': received,
             'share_pct': share_pct,
+            'fair': fair,
             'balance': balance,
             'balance_abs': abs(balance),
         }
