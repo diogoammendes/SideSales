@@ -573,6 +573,69 @@ input, select, textarea {
     border-radius: 999px;
 }
 
+.settlement-badge {
+    display: inline-block;
+    padding: 0.2rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.settlement-badge.owes {
+    background: rgba(220, 38, 38, 0.1);
+    color: var(--danger);
+}
+
+.settlement-badge.owed {
+    background: rgba(22, 163, 74, 0.1);
+    color: var(--success);
+}
+
+.settlement-badge.even {
+    background: var(--bg-soft);
+    color: var(--text-muted);
+}
+
+.transfer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.transfer-row {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1rem 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--card-muted);
+    flex-wrap: wrap;
+}
+
+.transfer-party {
+    display: flex;
+    flex-direction: column;
+    min-width: 120px;
+    gap: 0.1rem;
+}
+
+.transfer-arrow {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    justify-content: center;
+}
+
+.transfer-amount {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--text);
+}
+
 .entry-form {
     margin-bottom: 1.5rem;
     padding: 1rem;

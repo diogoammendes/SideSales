@@ -48,6 +48,7 @@
             {% if user.is_authenticated %}
                 <nav class="sidebar" id="sidebar">
                     <a href="{% url 'operations:dashboard' %}" class="nav-link">Dashboard</a>
+                    <a href="{% url 'operations:settlement' %}" class="nav-link">Acerto de contas</a>
                     <div class="nav-group">
                         <span>Compras</span>
                         <a href="{% url 'operations:purchase_list' %}">Lista</a>

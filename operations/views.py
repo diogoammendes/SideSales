@@ -293,6 +293,121 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         return context
 
 
+def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
+    """Per-user balances and minimum transfers for the settlement view.
+
+    Fair amount per user = (their investment / total investment) * total revenue.
+    Only non-draft sale payments count as received revenue.
+    """
+    invested_by_user: dict[int, Decimal] = {}
+
+    def add_investment(user_id: int | None, amount: Decimal | None) -> None:
+        if not user_id or not amount:
+            return
+        invested_by_user[user_id] = invested_by_user.get(user_id, ZERO) + amount
+
+    for purchase in purchases:
+        for contribution in purchase.contributions.all():
+            add_investment(contribution.payer_id, contribution.resolved_amount)
+        for cost in purchase.additional_costs.all():
+            add_investment(cost.paid_by_id, cost.amount)
+        add_investment(purchase.signal_paid_by_id, purchase.signal_amount_eur or ZERO)
+
+    total_invested = sum(invested_by_user.values(), ZERO)
+
+    payment_qs = (
+        SalePayment.objects
+        .exclude(sale__status=Sale.SaleStatus.DRAFT)
+        .values('receiver_id')
+        .annotate(total=Sum('amount'))
+    )
+    received_by_user: dict[int, Decimal] = {
+        p['receiver_id']: p['total'] or ZERO for p in payment_qs
+    }
+    total_received = sum(received_by_user.values(), ZERO)
+
+    all_user_ids = set(invested_by_user) | set(received_by_user)
+    n_users = len(all_user_ids) or 1
+
+    balances: dict[int, dict] = {}
+    for uid in all_user_ids:
+        invested = invested_by_user.get(uid, ZERO)
+        received = received_by_user.get(uid, ZERO)
+        if total_invested > ZERO:
+            fair = (invested / total_invested) * total_received
+        else:
+            fair = total_received / n_users
+        balance = received - fair
+        balances[uid] = {
+            'invested': invested,
+            'received': received,
+            'fair': fair,
+            'balance': balance,
+            'balance_abs': abs(balance),
+        }
+
+    # Minimum transfers — greedy Splitwise algorithm.
+    EPSILON = Decimal('0.005')
+    debtors = [[uid, info['balance']]
+               for uid, info in balances.items() if info['balance'] > EPSILON]
+    creditors = [[uid, -info['balance']]
+                 for uid, info in balances.items() if info['balance'] < -EPSILON]
+    debtors.sort(key=lambda x: x[1], reverse=True)
+    creditors.sort(key=lambda x: x[1], reverse=True)
+
+    transfers = []
+    i = j = 0
+    while i < len(debtors) and j < len(creditors):
+        amount = min(debtors[i][1], creditors[j][1])
+        if amount > EPSILON:
+            transfers.append({
+                'from_user_id': debtors[i][0],
+                'to_user_id': creditors[j][0],
+                'amount': amount.quantize(Decimal('0.01')),
+            })
+        debtors[i][1] -= amount
+        creditors[j][1] -= amount
+        if debtors[i][1] <= EPSILON:
+            i += 1
+        if creditors[j][1] <= EPSILON:
+            j += 1
+
+    users_by_id = {u.pk: u for u in User.objects.filter(pk__in=all_user_ids)}
+    for uid, info in balances.items():
+        info['user'] = users_by_id.get(uid)
+    for t in transfers:
+        t['from_user'] = users_by_id.get(t['from_user_id'])
+        t['to_user'] = users_by_id.get(t['to_user_id'])
+
+    balance_rows = sorted(
+        [info for info in balances.values() if info.get('user')],
+        key=lambda x: x['balance'],
+    )
+
+    return {
+        'balance_rows': balance_rows,
+        'transfers': transfers,
+        'total_invested': total_invested,
+        'total_received': total_received,
+        'total_profit': total_received - total_invested,
+    }
+
+
+class SettlementView(LoginRequiredMixin, TemplateView):
+    template_name = 'operations/settlement.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        purchases = list(
+            Purchase.objects.prefetch_related(
+                'additional_costs__paid_by',
+                'contributions__payer',
+            )
+        )
+        context.update(_compute_settlement(purchases))
+        return context
+
+
 # ---------------------------------------------------------------------------
 # Form-view helper
 # ---------------------------------------------------------------------------

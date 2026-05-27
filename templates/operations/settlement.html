@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Acerto de contas · SideSales{% endblock %}
+{% block content %}
+
+<header class="panel-header">
+    <div>
+        <h2>Acerto de contas</h2>
+        <p class="muted">Transferências mínimas para equilibrar os saldos. Vendas em rascunho excluídas.</p>
+    </div>
+</header>
+
+<div class="cards" style="margin: 1.5rem 0;">
+    <article class="card">
+        <span class="muted">Total investido</span>
+        <h3>{{ total_invested|floatformat:2 }} €</h3>
+    </article>
+    <article class="card">
+        <span class="muted">Total recebido</span>
+        <h3>{{ total_received|floatformat:2 }} €</h3>
+    </article>
+    <article class="card">
+        <span class="muted">Resultado</span>
+        <h3 class="{% if total_profit < 0 %}text-danger{% else %}text-success{% endif %}">
+            {{ total_profit|floatformat:2 }} €
+        </h3>
+    </article>
+</div>
+
+<section class="panel">
+    <header class="panel-header">
+        <div>
+            <h3>Posição de cada utilizador</h3>
+            <p class="muted">Quota proporcional ao investimento vs. pagamentos efetivamente recebidos.</p>
+        </div>
+    </header>
+    <div class="table-wrapper">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Utilizador</th>
+                <th>Investido</th>
+                <th>Quota justa</th>
+                <th>Recebido</th>
+                <th>Saldo</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in balance_rows %}
+                <tr>
+                    <td data-label="Utilizador">
+                        <strong>{{ row.user.get_full_name|default:row.user.username }}</strong>
+                    </td>
+                    <td data-label="Investido">{{ row.invested|floatformat:2 }} €</td>
+                    <td data-label="Quota justa">{{ row.fair|floatformat:2 }} €</td>
+                    <td data-label="Recebido">{{ row.received|floatformat:2 }} €</td>
+                    <td data-label="Saldo">
+                        {% if row.balance > 0 %}
+                            <span class="settlement-badge owes">deve {{ row.balance|floatformat:2 }} €</span>
+                        {% elif row.balance < 0 %}
+                            <span class="settlement-badge owed">a receber {{ row.balance_abs|floatformat:2 }} €</span>
+                        {% else %}
+                            <span class="settlement-badge even">equilibrado</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="5" class="muted">Sem movimentos registados.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</section>
+
+<section class="panel">
+    <header class="panel-header">
+        <div>
+            <h3>Transferências necessárias</h3>
+            <p class="muted">
+                {% if transfers %}
+                    {{ transfers|length }} transferência{{ transfers|length|pluralize:"s" }} para equilibrar todos os saldos.
+                {% else %}
+                    Nenhuma transferência necessária.
+                {% endif %}
+            </p>
+        </div>
+    </header>
+    {% if transfers %}
+        <div class="transfer-list">
+            {% for t in transfers %}
+                <div class="transfer-row">
+                    <div class="transfer-party">
+                        <span class="muted">paga</span>
+                        <strong>{{ t.from_user.get_full_name|default:t.from_user.username }}</strong>
+                    </div>
+                    <div class="transfer-arrow">
+                        <span class="transfer-amount">{{ t.amount|floatformat:2 }} €</span>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </div>
+                    <div class="transfer-party">
+                        <span class="muted">recebe</span>
+                        <strong>{{ t.to_user.get_full_name|default:t.to_user.username }}</strong>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="muted">Os saldos já estão equilibrados — não são necessárias transferências.</p>
+    {% endif %}
+</section>
+
+{% endblock %}
