@@ -343,9 +343,9 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
         balances[uid] = {
             'invested': invested,
             'received': received,
+            'result': received - invested,
             'share_pct': share_pct,
             'fair': fair,
-            'profit': fair - invested,
             'balance': balance,
             'balance_abs': abs(balance),
         }
@@ -385,8 +385,10 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
 
     balance_rows = sorted(
         [info for info in balances.values() if info.get('user')],
-        key=lambda x: x['balance'],
+        key=lambda x: (x['user'].first_name or '', x['user'].username),
     )
+
+    total_result = sum(r['result'] for r in balance_rows)
 
     return {
         'balance_rows': balance_rows,
@@ -394,6 +396,7 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
         'total_invested': total_invested,
         'total_received': total_received,
         'total_profit': total_received - total_invested,
+        'total_result': total_result,
     }
 
 

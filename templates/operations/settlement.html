@@ -5,34 +5,15 @@
 <header class="panel-header">
     <div>
         <h2>Acerto de contas</h2>
-        <p class="muted">Transferências mínimas para equilibrar os saldos. Vendas em rascunho excluídas.</p>
+        <p class="muted">Vendas em rascunho excluídas.</p>
     </div>
 </header>
-
-<div class="cards" style="margin: 1.5rem 0;">
-    <article class="card">
-        <span class="muted">Total investido</span>
-        <h3>{{ total_invested|floatformat:2 }} €</h3>
-    </article>
-    <article class="card">
-        <span class="muted">Total recebido</span>
-        <h3>{{ total_received|floatformat:2 }} €</h3>
-    </article>
-    <article class="card">
-        <span class="muted">Resultado</span>
-        <h3 class="{% if total_profit < 0 %}text-danger{% else %}text-success{% endif %}">
-            {{ total_profit|floatformat:2 }} €
-        </h3>
-    </article>
-</div>
 
 <section class="panel">
     <header class="panel-header">
         <div>
-            <h3>Posição de cada utilizador</h3>
-            <p class="muted">
-                O saldo indica quanto cada um recebeu a mais ou a menos face à sua quota de investimento.
-            </p>
+            <h3>Posição atual por utilizador</h3>
+            <p class="muted">O resultado é o que cada utilizador recebeu menos o que investiu.</p>
         </div>
     </header>
     <div class="table-wrapper">
@@ -41,10 +22,8 @@
             <tr>
                 <th>Utilizador</th>
                 <th>Investido</th>
-                <th>Resultado</th>
-                <th>Direito a receber</th>
                 <th>Recebido</th>
-                <th>Saldo</th>
+                <th>Resultado</th>
             </tr>
         </thead>
         <tbody>
@@ -54,27 +33,29 @@
                         <strong>{{ row.user.get_full_name|default:row.user.username }}</strong>
                     </td>
                     <td data-label="Investido">{{ row.invested|floatformat:2 }} €</td>
-                    <td data-label="Resultado" class="{% if row.profit < 0 %}text-danger{% else %}text-success{% endif %}">
-                        {{ row.profit|floatformat:2 }} €
-                    </td>
-                    <td data-label="Direito a receber">{{ row.fair|floatformat:2 }} €</td>
                     <td data-label="Recebido">{{ row.received|floatformat:2 }} €</td>
-                    <td data-label="Saldo">
-                        {% if row.balance > 0 %}
-                            <span class="settlement-badge owes">deve {{ row.balance|floatformat:2 }} €</span>
-                        {% elif row.balance < 0 %}
-                            <span class="settlement-badge owed">a receber {{ row.balance_abs|floatformat:2 }} €</span>
-                        {% else %}
-                            <span class="settlement-badge even">equilibrado</span>
-                        {% endif %}
+                    <td data-label="Resultado" class="{% if row.result < 0 %}text-danger{% else %}text-success{% endif %}">
+                        {{ row.result|floatformat:2 }} €
                     </td>
                 </tr>
             {% empty %}
                 <tr>
-                    <td colspan="6" class="muted">Sem movimentos registados.</td>
+                    <td colspan="4" class="muted">Sem movimentos registados.</td>
                 </tr>
             {% endfor %}
         </tbody>
+        {% if balance_rows %}
+        <tfoot>
+            <tr class="settlement-total-row">
+                <td><strong>Total</strong></td>
+                <td><strong>{{ total_invested|floatformat:2 }} €</strong></td>
+                <td><strong>{{ total_received|floatformat:2 }} €</strong></td>
+                <td class="{% if total_result < 0 %}text-danger{% else %}text-success{% endif %}">
+                    <strong>{{ total_result|floatformat:2 }} €</strong>
+                </td>
+            </tr>
+        </tfoot>
+        {% endif %}
     </table>
     </div>
 </section>
@@ -82,12 +63,14 @@
 <section class="panel">
     <header class="panel-header">
         <div>
-            <h3>Transferências necessárias</h3>
+            <h3>Transferências para distribuição proporcional</h3>
             <p class="muted">
+                O resultado total de <strong>{{ total_result|floatformat:2 }} €</strong>
+                é distribuído proporcionalmente ao investimento de cada utilizador.
                 {% if transfers %}
-                    {{ transfers|length }} transferência{{ transfers|length|pluralize:"s" }} para equilibrar todos os saldos.
+                    São necessárias {{ transfers|length }} transferência{{ transfers|length|pluralize:"s" }}:
                 {% else %}
-                    Nenhuma transferência necessária.
+                    Nenhuma transferência necessária — os saldos já estão equilibrados.
                 {% endif %}
             </p>
         </div>
@@ -111,8 +94,6 @@
                 </div>
             {% endfor %}
         </div>
-    {% else %}
-        <p class="muted">Os saldos já estão equilibrados — não são necessárias transferências.</p>
     {% endif %}
 </section>
 

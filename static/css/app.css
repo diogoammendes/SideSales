@@ -573,6 +573,11 @@ input, select, textarea {
     border-radius: 999px;
 }
 
+.settlement-total-row td {
+    border-top: 2px solid var(--border-strong);
+    padding-top: 0.85rem;
+}
+
 .settlement-badge {
     display: inline-block;
     padding: 0.2rem 0.7rem;
