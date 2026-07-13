@@ -41,6 +41,7 @@
             <tr>
                 <th>Utilizador</th>
                 <th>Investido</th>
+                <th>Resultado</th>
                 <th>Direito a receber</th>
                 <th>Recebido</th>
                 <th>Saldo</th>
@@ -53,6 +54,9 @@
                         <strong>{{ row.user.get_full_name|default:row.user.username }}</strong>
                     </td>
                     <td data-label="Investido">{{ row.invested|floatformat:2 }} €</td>
+                    <td data-label="Resultado" class="{% if row.profit < 0 %}text-danger{% else %}text-success{% endif %}">
+                        {{ row.profit|floatformat:2 }} €
+                    </td>
                     <td data-label="Direito a receber">{{ row.fair|floatformat:2 }} €</td>
                     <td data-label="Recebido">{{ row.received|floatformat:2 }} €</td>
                     <td data-label="Saldo">
@@ -67,7 +71,7 @@
                 </tr>
             {% empty %}
                 <tr>
-                    <td colspan="5" class="muted">Sem movimentos registados.</td>
+                    <td colspan="6" class="muted">Sem movimentos registados.</td>
                 </tr>
             {% endfor %}
         </tbody>
