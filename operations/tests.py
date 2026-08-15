@@ -357,11 +357,14 @@ class DistributionModeTests(BaseFinanceTest):
         self.assertEqual(admin_row['invested'], Decimal('600'))
         self.assertEqual(manager_row['invested'], Decimal('400'))
         
+        # Admin invested 60%, gets 60% of profit (300)
+        # Revenue = investment + profit = 600 + 300 = 900
         self.assertEqual(admin_row['attributed_revenue'], Decimal('900'))
-        self.assertEqual(manager_row['attributed_revenue'], Decimal('600'))
-        
-        total_profit = Decimal('500')
         self.assertEqual(admin_row['attributed_profit'], Decimal('300'))
+        
+        # Manager invested 40%, gets 40% of profit (200)
+        # Revenue = investment + profit = 400 + 200 = 600
+        self.assertEqual(manager_row['attributed_revenue'], Decimal('600'))
         self.assertEqual(manager_row['attributed_profit'], Decimal('200'))
         
     def test_equal_distribution_ledger(self):
@@ -381,10 +384,14 @@ class DistributionModeTests(BaseFinanceTest):
         self.assertEqual(admin_row['invested'], Decimal('600'))
         self.assertEqual(manager_row['invested'], Decimal('400'))
         
-        self.assertEqual(admin_row['attributed_revenue'], Decimal('750'))
-        self.assertEqual(manager_row['attributed_revenue'], Decimal('750'))
-        
+        # Total profit = 1500 - 1000 = 500
+        # Equal profit share = 500 / 2 = 250 each
+        # Admin: investment 600 + profit 250 = 850
+        # Manager: investment 400 + profit 250 = 650
+        self.assertEqual(admin_row['attributed_revenue'], Decimal('850'))
         self.assertEqual(admin_row['attributed_profit'], Decimal('250'))
+        
+        self.assertEqual(manager_row['attributed_revenue'], Decimal('650'))
         self.assertEqual(manager_row['attributed_profit'], Decimal('250'))
         
     def test_proportional_distribution_settlement(self):
@@ -405,14 +412,20 @@ class DistributionModeTests(BaseFinanceTest):
             r for r in result['balance_rows'] if r['user'].pk == self.manager.pk
         )
         
+        # Admin invested 60% (600/1000), gets 60% of 500 profit = 300
+        # Fair = 600 + 300 = 900, received 900, balance = 0
         self.assertEqual(admin_balance['share_pct'], Decimal('60'))
-        self.assertEqual(manager_balance['share_pct'], Decimal('40'))
-        
         self.assertEqual(admin_balance['fair'], Decimal('900'))
+        self.assertEqual(admin_balance['balance'], Decimal('0'))
+        
+        # Manager invested 40% (400/1000), gets 40% of 500 profit = 200
+        # Fair = 400 + 200 = 600, received 600, balance = 0
+        self.assertEqual(manager_balance['share_pct'], Decimal('40'))
         self.assertEqual(manager_balance['fair'], Decimal('600'))
+        self.assertEqual(manager_balance['balance'], Decimal('0'))
         
     def test_equal_distribution_settlement(self):
-        """Settlement with equal mode."""
+        """Settlement with equal mode: profit is split 50/50."""
         settings = SystemSettings.get_settings()
         settings.distribution_mode = SystemSettings.DistributionMode.EQUAL
         settings.save()
@@ -429,8 +442,22 @@ class DistributionModeTests(BaseFinanceTest):
             r for r in result['balance_rows'] if r['user'].pk == self.manager.pk
         )
         
-        self.assertEqual(admin_balance['share_pct'], Decimal('50'))
-        self.assertEqual(manager_balance['share_pct'], Decimal('50'))
+        # Total profit = 500, split equally = 250 each
+        # Admin: fair = 600 invested + 250 profit = 850, received 900
+        # Balance = 900 - 850 = 50 (should pay)
+        self.assertEqual(admin_balance['fair'], Decimal('850'))
+        self.assertEqual(admin_balance['received'], Decimal('900'))
+        self.assertEqual(admin_balance['balance'], Decimal('50'))
         
-        self.assertEqual(admin_balance['fair'], Decimal('750'))
-        self.assertEqual(manager_balance['fair'], Decimal('750'))
+        # Manager: fair = 400 invested + 250 profit = 650, received 600
+        # Balance = 600 - 650 = -50 (should receive)
+        self.assertEqual(manager_balance['fair'], Decimal('650'))
+        self.assertEqual(manager_balance['received'], Decimal('600'))
+        self.assertEqual(manager_balance['balance'], Decimal('-50'))
+        
+        # Check there's a transfer from admin to manager
+        self.assertEqual(len(result['transfers']), 1)
+        transfer = result['transfers'][0]
+        self.assertEqual(transfer['from_user_id'], self.admin.pk)
+        self.assertEqual(transfer['to_user_id'], self.manager.pk)
+        self.assertEqual(transfer['amount'], Decimal('50.00'))

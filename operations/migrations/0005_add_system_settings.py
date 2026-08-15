@@ -27,10 +27,10 @@ class Migration(migrations.Migration):
                     models.CharField(
                         choices=[
                             ("PROPORTIONAL", "Proporcional ao investimento"),
-                            ("EQUAL", "Equitativa (50/50)"),
+                            ("EQUAL", "Lucro igual para todos (50/50)"),
                         ],
                         default="PROPORTIONAL",
-                        help_text="Escolha como os lucros serão distribuídos entre os utilizadores",
+                        help_text="Como distribuir o lucro total: proporcional ao investimento ou em partes iguais",
                         max_length=20,
                         verbose_name="Modo de distribuição de lucros",
                     ),

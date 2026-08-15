@@ -26,9 +26,9 @@
 4. **Dashboard**
    - Overall profit/loss = Σ(sales revenue) − Σ(purchase total incl. extra costs).
    - Per-user ledger = (received from sales) − (invested in purchases / extra costs).
-   - **Profit Distribution Modes**: Configurable system setting to control how profits are distributed:
-     - **Proportional** (default): Profits distributed proportionally to each user's investment share.
-     - **Equal**: Profits distributed equally among all users regardless of investment amount.
+   - **Profit Distribution Modes**: Configurable system setting to control how the total profit is distributed:
+     - **Proportional** (default): Each user gets their investment back + profit proportional to their investment share.
+     - **Equal (50/50)**: Each user gets their investment back + an equal share of the total profit.
 
 ## Data Model
 ```mermaid

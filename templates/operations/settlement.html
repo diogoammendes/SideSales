@@ -32,8 +32,8 @@
                     {% endfor %}
                 </select>
                 <small class="form-text">
-                    <strong>Proporcional:</strong> lucros divididos conforme o investimento de cada utilizador.<br>
-                    <strong>Equitativa:</strong> lucros divididos igualmente entre todos os utilizadores.
+                    <strong>Proporcional ao investimento:</strong> o lucro é dividido conforme o investimento de cada utilizador.<br>
+                    <strong>Lucro igual para todos (50/50):</strong> cada utilizador recebe o seu investimento de volta + parte igual do lucro total.
                 </small>
             </div>
         </form>
@@ -97,10 +97,10 @@
 <section class="panel">
     <header class="panel-header">
         <div>
-            <h3>Transferências para distribuição {{ is_equal_mode|yesno:"equitativa,proporcional" }}</h3>
+            <h3>Transferências para distribuição de lucros</h3>
             <p class="muted">
-                O resultado total de <strong>{{ total_result|floatformat:2 }} €</strong>
-                é distribuído {% if is_equal_mode %}igualmente entre todos os utilizadores{% else %}proporcionalmente ao investimento de cada utilizador{% endif %}.
+                O lucro total de <strong>{{ total_result|floatformat:2 }} €</strong>
+                é distribuído {% if is_equal_mode %}em partes iguais entre todos os utilizadores{% else %}proporcionalmente ao investimento de cada utilizador{% endif %}.
                 {% if transfers %}
                     São necessárias {{ transfers|length }} transferência{{ transfers|length|pluralize:"s" }}:
                 {% else %}
