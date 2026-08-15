@@ -162,7 +162,7 @@ def _compute_ledger(purchases: Iterable[Purchase]) -> tuple[list[dict], Decimal]
     from operations.models import SystemSettings
     
     settings = SystemSettings.get_settings()
-    is_equal_mode = settings.distribution_mode == SystemSettings.DistributionMode.EQUAL
+    distribution_mode = settings.distribution_mode
     
     ledger_map: dict[int, LedgerEntry] = {}
 
@@ -216,13 +216,16 @@ def _compute_ledger(purchases: Iterable[Purchase]) -> tuple[list[dict], Decimal]
             entry = entry_for(user_id)
             entry.invested += invested
             
-            if is_equal_mode:
-                share = Decimal('1') / n_investors
+            if distribution_mode == SystemSettings.DistributionMode.EQUAL:
+                # Equal profit distribution: each user gets equal share of profit
+                equal_profit_share = purchase_realized_profit / n_investors
+                entry.attributed_revenue += invested + equal_profit_share
+                entry.attributed_profit += equal_profit_share
             else:
+                # Proportional distribution: profit share follows investment share
                 share = invested / purchase_total_invested
-                
-            entry.attributed_revenue += share * purchase_realized_revenue
-            entry.attributed_profit += share * purchase_realized_profit
+                entry.attributed_revenue += share * purchase_realized_revenue
+                entry.attributed_profit += share * purchase_realized_profit
 
     # Actual received: sum payments per receiver, regardless of active status.
     payment_totals = (
@@ -308,15 +311,15 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
     """Per-user balances and minimum transfers for the settlement view.
 
     Fair amount per user depends on distribution mode:
-    - PROPORTIONAL: (their investment / total investment) * total revenue
-    - EQUAL: total revenue / number of users
+    - PROPORTIONAL: investment + (investment_share * total_profit)
+    - EQUAL: investment + (total_profit / number_of_users)
     
     Only non-draft sale payments count as received revenue.
     """
     from operations.models import SystemSettings
     
     settings = SystemSettings.get_settings()
-    is_equal_mode = settings.distribution_mode == SystemSettings.DistributionMode.EQUAL
+    distribution_mode = settings.distribution_mode
     
     invested_by_user: dict[int, Decimal] = {}
 
@@ -347,19 +350,27 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
 
     all_user_ids = set(invested_by_user) | set(received_by_user)
     n_users = len(all_user_ids) or 1
+    total_profit = total_received - total_invested
 
     balances: dict[int, dict] = {}
     for uid in all_user_ids:
         invested = invested_by_user.get(uid, ZERO)
         received = received_by_user.get(uid, ZERO)
         
-        if is_equal_mode:
-            share_pct = Decimal('100') / n_users
-            fair = total_received / n_users
+        if distribution_mode == SystemSettings.DistributionMode.EQUAL:
+            # Equal mode: each user gets their investment back + equal share of profit
+            equal_profit_share = total_profit / n_users
+            fair = invested + equal_profit_share
+            # Share percentage is based on fair amount relative to total received
+            share_pct = (fair / total_received * Decimal('100')) if total_received > ZERO else Decimal('100') / n_users
         elif total_invested > ZERO:
-            share_pct = (invested / total_invested) * Decimal('100')
-            fair = (invested / total_invested) * total_received
+            # Proportional mode: profit distributed by investment share
+            investment_share = invested / total_invested
+            proportional_profit = investment_share * total_profit
+            fair = invested + proportional_profit
+            share_pct = investment_share * Decimal('100')
         else:
+            # Fallback: equal distribution if no investment recorded
             share_pct = Decimal('100') / n_users
             fair = total_received / n_users
             
