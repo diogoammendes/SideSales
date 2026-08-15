@@ -7,6 +7,7 @@ from .models import (
     PurchaseContribution,
     Sale,
     SalePayment,
+    SystemSettings,
     User,
 )
 
@@ -78,3 +79,14 @@ class SaleAdmin(admin.ModelAdmin):
 class SalePaymentAdmin(admin.ModelAdmin):
     list_display = ('sale', 'receiver', 'amount', 'method', 'paid_on')
     list_filter = ('method', 'paid_on')
+
+
+@admin.register(SystemSettings)
+class SystemSettingsAdmin(admin.ModelAdmin):
+    list_display = ('distribution_mode',)
+    
+    def has_add_permission(self, request):
+        return not SystemSettings.objects.exists()
+    
+    def has_delete_permission(self, request, obj=None):
+        return False

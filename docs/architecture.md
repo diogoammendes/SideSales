@@ -26,6 +26,9 @@
 4. **Dashboard**
    - Overall profit/loss = Σ(sales revenue) − Σ(purchase total incl. extra costs).
    - Per-user ledger = (received from sales) − (invested in purchases / extra costs).
+   - **Profit Distribution Modes**: Configurable system setting to control how profits are distributed:
+     - **Proportional** (default): Profits distributed proportionally to each user's investment share.
+     - **Equal**: Profits distributed equally among all users regardless of investment amount.
 
 ## Data Model
 ```mermaid
@@ -99,6 +102,10 @@ erDiagram
         date   paid_on
         text   notes
     }
+    
+    SystemSettings {
+        string distribution_mode (PROPORTIONAL | EQUAL)
+    }
 ```
 
 ### Derived Totals
@@ -127,6 +134,10 @@ erDiagram
    - Cards for overall totals (invested, revenue, net profit).
    - Table per user with `invested`, `received`, `net`.
    - Table per purchase summarizing cost vs revenue vs profit.
+6. **Settlement**:
+   - View showing per-user balances and suggested transfers to balance accounts.
+   - Distribution mode selector (admin-only) to toggle between proportional and equal profit sharing.
+   - Minimum transfer calculation using greedy Splitwise-style algorithm.
 
 ## Permissions / Roles
 - `ADMIN`: full access incl. user management.
