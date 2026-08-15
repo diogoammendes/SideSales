@@ -12,6 +12,40 @@
 <section class="panel">
     <header class="panel-header">
         <div>
+            <h3>Configuração de distribuição de lucros</h3>
+            <p class="muted">
+                Modo atual: <strong>{{ distribution_mode_display }}</strong>
+            </p>
+        </div>
+    </header>
+    <div class="panel-body">
+        {% if user.has_elevated_privileges %}
+        <form method="post" action="{% url 'operations:update_distribution_mode' %}" style="max-width: 400px;">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="distribution_mode">Modo de distribuição:</label>
+                <select name="distribution_mode" id="distribution_mode" class="form-control" onchange="this.form.submit()">
+                    {% for value, label in distribution_choices %}
+                        <option value="{{ value }}" {% if value == distribution_mode %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <small class="form-text">
+                    <strong>Proporcional:</strong> lucros divididos conforme o investimento de cada utilizador.<br>
+                    <strong>Equitativa:</strong> lucros divididos igualmente entre todos os utilizadores.
+                </small>
+            </div>
+        </form>
+        {% else %}
+        <p class="muted">Apenas administradores podem alterar o modo de distribuição.</p>
+        {% endif %}
+    </div>
+</section>
+
+<section class="panel">
+    <header class="panel-header">
+        <div>
             <h3>Posição atual por utilizador</h3>
             <p class="muted">O resultado é o que cada utilizador recebeu menos o que investiu.</p>
         </div>
@@ -63,10 +97,10 @@
 <section class="panel">
     <header class="panel-header">
         <div>
-            <h3>Transferências para distribuição proporcional</h3>
+            <h3>Transferências para distribuição {{ is_equal_mode|yesno:"equitativa,proporcional" }}</h3>
             <p class="muted">
                 O resultado total de <strong>{{ total_result|floatformat:2 }} €</strong>
-                é distribuído proporcionalmente ao investimento de cada utilizador.
+                é distribuído {% if is_equal_mode %}igualmente entre todos os utilizadores{% else %}proporcionalmente ao investimento de cada utilizador{% endif %}.
                 {% if transfers %}
                     São necessárias {{ transfers|length }} transferência{{ transfers|length|pluralize:"s" }}:
                 {% else %}

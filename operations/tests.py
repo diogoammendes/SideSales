@@ -10,9 +10,10 @@ from .models import (
     PurchaseContribution,
     Sale,
     SalePayment,
+    SystemSettings,
     User,
 )
-from .views import _compute_ledger, _compute_sales_buckets
+from .views import _compute_ledger, _compute_sales_buckets, _compute_settlement
 
 
 class BaseFinanceTest(TestCase):
@@ -294,3 +295,142 @@ class PurchaseDeleteProtectionTests(BaseFinanceTest):
         )
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Purchase.objects.filter(pk=purchase.pk).exists())
+
+
+class DistributionModeTests(BaseFinanceTest):
+    """Tests for proportional vs equal distribution modes."""
+    
+    def setUp(self):
+        super().setUp()
+        purchase = Purchase.objects.create(
+            title='Test Purchase',
+            quantity=Decimal('10'),
+            total_amount_eur=Decimal('1000'),
+        )
+        PurchaseContribution.objects.create(
+            purchase=purchase,
+            payer=self.admin,
+            contribution_type=PurchaseContribution.ContributionType.ABSOLUTE,
+            value=Decimal('600'),
+        )
+        PurchaseContribution.objects.create(
+            purchase=purchase,
+            payer=self.manager,
+            contribution_type=PurchaseContribution.ContributionType.ABSOLUTE,
+            value=Decimal('400'),
+        )
+        sale = Sale.objects.create(
+            purchase=purchase,
+            buyer_name='Customer',
+            quantity=Decimal('10'),
+            unit_price=Decimal('150'),
+            status=Sale.SaleStatus.CONFIRMED,
+        )
+        SalePayment.objects.create(
+            sale=sale,
+            receiver=self.admin,
+            amount=Decimal('900'),
+            method=SalePayment.PaymentMethod.CASH,
+        )
+        SalePayment.objects.create(
+            sale=sale,
+            receiver=self.manager,
+            amount=Decimal('600'),
+            method=SalePayment.PaymentMethod.CASH,
+        )
+        self.purchase = purchase
+        
+    def test_proportional_distribution_ledger(self):
+        """Proportional mode: profit share follows investment share."""
+        settings = SystemSettings.get_settings()
+        settings.distribution_mode = SystemSettings.DistributionMode.PROPORTIONAL
+        settings.save()
+        
+        purchases = list(Purchase.objects.prefetch_related(
+            'additional_costs__paid_by', 'contributions__payer', 'sales',
+        ))
+        rows, total = _compute_ledger(purchases)
+        
+        admin_row = next(r for r in rows if r['user'].pk == self.admin.pk)
+        manager_row = next(r for r in rows if r['user'].pk == self.manager.pk)
+        
+        self.assertEqual(admin_row['invested'], Decimal('600'))
+        self.assertEqual(manager_row['invested'], Decimal('400'))
+        
+        self.assertEqual(admin_row['attributed_revenue'], Decimal('900'))
+        self.assertEqual(manager_row['attributed_revenue'], Decimal('600'))
+        
+        total_profit = Decimal('500')
+        self.assertEqual(admin_row['attributed_profit'], Decimal('300'))
+        self.assertEqual(manager_row['attributed_profit'], Decimal('200'))
+        
+    def test_equal_distribution_ledger(self):
+        """Equal mode: profit split equally regardless of investment."""
+        settings = SystemSettings.get_settings()
+        settings.distribution_mode = SystemSettings.DistributionMode.EQUAL
+        settings.save()
+        
+        purchases = list(Purchase.objects.prefetch_related(
+            'additional_costs__paid_by', 'contributions__payer', 'sales',
+        ))
+        rows, total = _compute_ledger(purchases)
+        
+        admin_row = next(r for r in rows if r['user'].pk == self.admin.pk)
+        manager_row = next(r for r in rows if r['user'].pk == self.manager.pk)
+        
+        self.assertEqual(admin_row['invested'], Decimal('600'))
+        self.assertEqual(manager_row['invested'], Decimal('400'))
+        
+        self.assertEqual(admin_row['attributed_revenue'], Decimal('750'))
+        self.assertEqual(manager_row['attributed_revenue'], Decimal('750'))
+        
+        self.assertEqual(admin_row['attributed_profit'], Decimal('250'))
+        self.assertEqual(manager_row['attributed_profit'], Decimal('250'))
+        
+    def test_proportional_distribution_settlement(self):
+        """Settlement with proportional mode."""
+        settings = SystemSettings.get_settings()
+        settings.distribution_mode = SystemSettings.DistributionMode.PROPORTIONAL
+        settings.save()
+        
+        purchases = list(Purchase.objects.prefetch_related(
+            'additional_costs__paid_by', 'contributions__payer',
+        ))
+        result = _compute_settlement(purchases)
+        
+        admin_balance = next(
+            r for r in result['balance_rows'] if r['user'].pk == self.admin.pk
+        )
+        manager_balance = next(
+            r for r in result['balance_rows'] if r['user'].pk == self.manager.pk
+        )
+        
+        self.assertEqual(admin_balance['share_pct'], Decimal('60'))
+        self.assertEqual(manager_balance['share_pct'], Decimal('40'))
+        
+        self.assertEqual(admin_balance['fair'], Decimal('900'))
+        self.assertEqual(manager_balance['fair'], Decimal('600'))
+        
+    def test_equal_distribution_settlement(self):
+        """Settlement with equal mode."""
+        settings = SystemSettings.get_settings()
+        settings.distribution_mode = SystemSettings.DistributionMode.EQUAL
+        settings.save()
+        
+        purchases = list(Purchase.objects.prefetch_related(
+            'additional_costs__paid_by', 'contributions__payer',
+        ))
+        result = _compute_settlement(purchases)
+        
+        admin_balance = next(
+            r for r in result['balance_rows'] if r['user'].pk == self.admin.pk
+        )
+        manager_balance = next(
+            r for r in result['balance_rows'] if r['user'].pk == self.manager.pk
+        )
+        
+        self.assertEqual(admin_balance['share_pct'], Decimal('50'))
+        self.assertEqual(manager_balance['share_pct'], Decimal('50'))
+        
+        self.assertEqual(admin_balance['fair'], Decimal('750'))
+        self.assertEqual(manager_balance['fair'], Decimal('750'))

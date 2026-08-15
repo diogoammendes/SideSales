@@ -7,6 +7,7 @@ app_name = 'operations'
 urlpatterns = [
     path('', views.DashboardView.as_view(), name='dashboard'),
     path('acerto/', views.SettlementView.as_view(), name='settlement'),
+    path('configuracoes/distribuicao/', views.UpdateDistributionModeView.as_view(), name='update_distribution_mode'),
     # Purchases
     path('compras/', views.PurchaseListView.as_view(), name='purchase_list'),
     path('compras/nova/', views.PurchaseCreateView.as_view(), name='purchase_create'),

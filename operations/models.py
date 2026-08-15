@@ -314,3 +314,30 @@ class SalePayment(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"Pagamento {self.amount} - {self.sale}"
+
+
+class SystemSettings(models.Model):
+    class DistributionMode(models.TextChoices):
+        PROPORTIONAL = 'PROPORTIONAL', _('Proporcional ao investimento')
+        EQUAL = 'EQUAL', _('Equitativa (50/50)')
+
+    distribution_mode = models.CharField(
+        max_length=20,
+        choices=DistributionMode.choices,
+        default=DistributionMode.PROPORTIONAL,
+        verbose_name=_('Modo de distribuição de lucros'),
+        help_text=_('Escolha como os lucros serão distribuídos entre os utilizadores'),
+    )
+
+    class Meta:
+        verbose_name = _('Configurações do sistema')
+        verbose_name_plural = _('Configurações do sistema')
+
+    def __str__(self) -> str:
+        return 'Configurações do sistema'
+
+    @classmethod
+    def get_settings(cls) -> 'SystemSettings':
+        """Get or create the singleton settings instance."""
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj

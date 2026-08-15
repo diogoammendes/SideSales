@@ -159,6 +159,11 @@ def _compute_ledger(purchases: Iterable[Purchase]) -> tuple[list[dict], Decimal]
     must never make their investments or received payments disappear from the
     financial record.
     """
+    from operations.models import SystemSettings
+    
+    settings = SystemSettings.get_settings()
+    is_equal_mode = settings.distribution_mode == SystemSettings.DistributionMode.EQUAL
+    
     ledger_map: dict[int, LedgerEntry] = {}
 
     def entry_for(user_id: int) -> LedgerEntry:
@@ -206,10 +211,16 @@ def _compute_ledger(purchases: Iterable[Purchase]) -> tuple[list[dict], Decimal]
         if not purchase_investments or purchase_total_invested <= 0:
             continue
 
+        n_investors = len(purchase_investments)
         for user_id, invested in purchase_investments.items():
             entry = entry_for(user_id)
             entry.invested += invested
-            share = invested / purchase_total_invested
+            
+            if is_equal_mode:
+                share = Decimal('1') / n_investors
+            else:
+                share = invested / purchase_total_invested
+                
             entry.attributed_revenue += share * purchase_realized_revenue
             entry.attributed_profit += share * purchase_realized_profit
 
@@ -296,9 +307,17 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
     """Per-user balances and minimum transfers for the settlement view.
 
-    Fair amount per user = (their investment / total investment) * total revenue.
+    Fair amount per user depends on distribution mode:
+    - PROPORTIONAL: (their investment / total investment) * total revenue
+    - EQUAL: total revenue / number of users
+    
     Only non-draft sale payments count as received revenue.
     """
+    from operations.models import SystemSettings
+    
+    settings = SystemSettings.get_settings()
+    is_equal_mode = settings.distribution_mode == SystemSettings.DistributionMode.EQUAL
+    
     invested_by_user: dict[int, Decimal] = {}
 
     def add_investment(user_id: int | None, amount: Decimal | None) -> None:
@@ -333,12 +352,17 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
     for uid in all_user_ids:
         invested = invested_by_user.get(uid, ZERO)
         received = received_by_user.get(uid, ZERO)
-        if total_invested > ZERO:
+        
+        if is_equal_mode:
+            share_pct = Decimal('100') / n_users
+            fair = total_received / n_users
+        elif total_invested > ZERO:
             share_pct = (invested / total_invested) * Decimal('100')
             fair = (invested / total_invested) * total_received
         else:
             share_pct = Decimal('100') / n_users
             fair = total_received / n_users
+            
         balance = received - fair
         balances[uid] = {
             'invested': invested,
@@ -412,7 +436,40 @@ class SettlementView(LoginRequiredMixin, TemplateView):
             )
         )
         context.update(_compute_settlement(purchases))
+        
+        from operations.models import SystemSettings
+        settings = SystemSettings.get_settings()
+        context['distribution_mode'] = settings.distribution_mode
+        context['distribution_mode_display'] = settings.get_distribution_mode_display()
+        context['is_equal_mode'] = settings.distribution_mode == SystemSettings.DistributionMode.EQUAL
+        context['distribution_choices'] = SystemSettings.DistributionMode.choices
+        
         return context
+
+
+class UpdateDistributionModeView(LoginRequiredMixin, View):
+    """Update the profit distribution mode setting."""
+    
+    def post(self, request):
+        from operations.models import SystemSettings
+        
+        if not request.user.has_elevated_privileges:
+            messages.error(request, 'Não tem permissões para alterar as configurações do sistema.')
+            return redirect('operations:settlement')
+        
+        mode = request.POST.get('distribution_mode')
+        if mode not in dict(SystemSettings.DistributionMode.choices):
+            messages.error(request, 'Modo de distribuição inválido.')
+            return redirect('operations:settlement')
+        
+        settings = SystemSettings.get_settings()
+        settings.distribution_mode = mode
+        settings.save()
+        
+        mode_display = settings.get_distribution_mode_display()
+        messages.success(request, f'Modo de distribuição alterado para: {mode_display}')
+        
+        return redirect('operations:settlement')
 
 
 # ---------------------------------------------------------------------------
