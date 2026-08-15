@@ -319,14 +319,14 @@ class SalePayment(TimeStampedModel):
 class SystemSettings(models.Model):
     class DistributionMode(models.TextChoices):
         PROPORTIONAL = 'PROPORTIONAL', _('Proporcional ao investimento')
-        EQUAL = 'EQUAL', _('Equitativa (50/50)')
+        EQUAL = 'EQUAL', _('Lucro igual para todos (50/50)')
 
     distribution_mode = models.CharField(
         max_length=20,
         choices=DistributionMode.choices,
         default=DistributionMode.PROPORTIONAL,
         verbose_name=_('Modo de distribuição de lucros'),
-        help_text=_('Escolha como os lucros serão distribuídos entre os utilizadores'),
+        help_text=_('Como distribuir o lucro total: proporcional ao investimento ou em partes iguais'),
     )
 
     class Meta:
