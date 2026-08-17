@@ -12,40 +12,6 @@
 <section class="panel">
     <header class="panel-header">
         <div>
-            <h3>Configuração de distribuição de lucros</h3>
-            <p class="muted">
-                Modo atual: <strong>{{ distribution_mode_display }}</strong>
-            </p>
-        </div>
-    </header>
-    <div class="panel-body">
-        {% if user.has_elevated_privileges %}
-        <form method="post" action="{% url 'operations:update_distribution_mode' %}" style="max-width: 400px;">
-            {% csrf_token %}
-            <div class="form-group">
-                <label for="distribution_mode">Modo de distribuição:</label>
-                <select name="distribution_mode" id="distribution_mode" class="form-control" onchange="this.form.submit()">
-                    {% for value, label in distribution_choices %}
-                        <option value="{{ value }}" {% if value == distribution_mode %}selected{% endif %}>
-                            {{ label }}
-                        </option>
-                    {% endfor %}
-                </select>
-                <small class="form-text">
-                    <strong>Proporcional ao investimento:</strong> o lucro é dividido conforme o investimento de cada utilizador.<br>
-                    <strong>Lucro igual para todos (50/50):</strong> cada utilizador recebe o seu investimento de volta + parte igual do lucro total.
-                </small>
-            </div>
-        </form>
-        {% else %}
-        <p class="muted">Apenas administradores podem alterar o modo de distribuição.</p>
-        {% endif %}
-    </div>
-</section>
-
-<section class="panel">
-    <header class="panel-header">
-        <div>
             <h3>Posição atual por utilizador</h3>
             <p class="muted">O resultado é o que cada utilizador recebeu menos o que investiu.</p>
         </div>
