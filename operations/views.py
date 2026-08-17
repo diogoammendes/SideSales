@@ -447,40 +447,14 @@ class SettlementView(LoginRequiredMixin, TemplateView):
             )
         )
         context.update(_compute_settlement(purchases))
-        
+
         from operations.models import SystemSettings
         settings = SystemSettings.get_settings()
-        context['distribution_mode'] = settings.distribution_mode
-        context['distribution_mode_display'] = settings.get_distribution_mode_display()
-        context['is_equal_mode'] = settings.distribution_mode == SystemSettings.DistributionMode.EQUAL
-        context['distribution_choices'] = SystemSettings.DistributionMode.choices
-        
+        context['is_equal_mode'] = (
+            settings.distribution_mode == SystemSettings.DistributionMode.EQUAL
+        )
+
         return context
-
-
-class UpdateDistributionModeView(LoginRequiredMixin, View):
-    """Update the profit distribution mode setting."""
-    
-    def post(self, request):
-        from operations.models import SystemSettings
-        
-        if not request.user.has_elevated_privileges:
-            messages.error(request, 'Não tem permissões para alterar as configurações do sistema.')
-            return redirect('operations:settlement')
-        
-        mode = request.POST.get('distribution_mode')
-        if mode not in dict(SystemSettings.DistributionMode.choices):
-            messages.error(request, 'Modo de distribuição inválido.')
-            return redirect('operations:settlement')
-        
-        settings = SystemSettings.get_settings()
-        settings.distribution_mode = mode
-        settings.save()
-        
-        mode_display = settings.get_distribution_mode_display()
-        messages.success(request, f'Modo de distribuição alterado para: {mode_display}')
-        
-        return redirect('operations:settlement')
 
 
 # ---------------------------------------------------------------------------
@@ -945,3 +919,41 @@ class UserPasswordUpdateView(_AdminOnlyUserMixin, View):
             return redirect('operations:user_list')
         messages.error(request, _('Por favor corrija os erros abaixo.'))
         return self._render(request, form)
+
+
+# ---------------------------------------------------------------------------
+# System settings
+# ---------------------------------------------------------------------------
+
+class SettingsView(_AdminOnlyUserMixin, TemplateView):
+    template_name = 'operations/settings.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from operations.models import SystemSettings
+        settings = SystemSettings.get_settings()
+        context['distribution_mode'] = settings.distribution_mode
+        context['distribution_mode_display'] = settings.get_distribution_mode_display()
+        context['distribution_choices'] = SystemSettings.DistributionMode.choices
+        return context
+
+
+class UpdateDistributionModeView(_AdminOnlyUserMixin, View):
+    """Update the profit distribution mode setting."""
+
+    def post(self, request):
+        from operations.models import SystemSettings
+
+        mode = request.POST.get('distribution_mode')
+        if mode not in dict(SystemSettings.DistributionMode.choices):
+            messages.error(request, 'Modo de distribuição inválido.')
+            return redirect('operations:settings')
+
+        settings = SystemSettings.get_settings()
+        settings.distribution_mode = mode
+        settings.save()
+
+        mode_display = settings.get_distribution_mode_display()
+        messages.success(request, f'Modo de distribuição alterado para: {mode_display}')
+
+        return redirect('operations:settings')

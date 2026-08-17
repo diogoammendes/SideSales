@@ -217,6 +217,26 @@ class PrivilegeEscalationTests(BaseFinanceTest):
         response = self.client.get(reverse('operations:user_list'))
         self.assertEqual(response.status_code, 403)
 
+    def test_admin_can_access_settings(self):
+        self.client.login(username='admin', password='pw')
+        response = self.client.get(reverse('operations:settings'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_viewer_cannot_access_settings(self):
+        self.client.login(username='viewer', password='pw')
+        response = self.client.get(reverse('operations:settings'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_update_distribution_mode_redirects_to_settings(self):
+        self.client.login(username='admin', password='pw')
+        response = self.client.post(
+            reverse('operations:update_distribution_mode'),
+            {'distribution_mode': SystemSettings.DistributionMode.EQUAL},
+        )
+        self.assertRedirects(response, reverse('operations:settings'))
+        settings = SystemSettings.get_settings()
+        self.assertEqual(settings.distribution_mode, SystemSettings.DistributionMode.EQUAL)
+
 
 class SaleDeleteTests(BaseFinanceTest):
     def _sale_without_payments(self) -> Sale:
