@@ -316,6 +316,48 @@ class SalePayment(TimeStampedModel):
         return f"Pagamento {self.amount} - {self.sale}"
 
 
+class SettlementTransfer(TimeStampedModel):
+    """Transferência entre utilizadores para acertar valores recebidos."""
+
+    from_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='settlement_transfers_sent',
+    )
+    to_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='settlement_transfers_received',
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=POSITIVE)
+    settled_on = models.DateField(default=timezone.now)
+    notes = models.CharField(max_length=255, blank=True)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='settlement_transfers_recorded',
+    )
+
+    class Meta:
+        ordering = ['-settled_on', '-created_at']
+        verbose_name = _('Acerto entre utilizadores')
+        verbose_name_plural = _('Acertos entre utilizadores')
+
+    def clean(self) -> None:
+        super().clean()
+        if self.from_user_id and self.to_user_id and self.from_user_id == self.to_user_id:
+            raise ValidationError(_('O pagador e o receptor têm de ser utilizadores diferentes.'))
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f'{self.from_user} → {self.to_user}: {self.amount}'
+
+
 class SystemSettings(models.Model):
     class DistributionMode(models.TextChoices):
         PROPORTIONAL = 'PROPORTIONAL', _('Proporcional ao investimento')

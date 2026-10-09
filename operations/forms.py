@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.db.models import Q
 from django.forms import inlineformset_factory
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from .models import (
@@ -13,6 +14,7 @@ from .models import (
     PurchaseContribution,
     Sale,
     SalePayment,
+    SettlementTransfer,
     User,
 )
 
@@ -212,6 +214,30 @@ class SalePaymentForm(forms.ModelForm):
         if amount is None or amount <= 0:
             raise forms.ValidationError(_('Montante tem de ser maior que zero.'))
         return amount
+
+
+class SettlementTransferForm(forms.ModelForm):
+    class Meta:
+        model = SettlementTransfer
+        fields = ['from_user', 'to_user', 'amount', 'settled_on', 'notes']
+        widgets = {'settled_on': forms.DateInput(attrs={'type': 'date'})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ('from_user', 'to_user'):
+            if field_name in self.fields:
+                current = getattr(self.instance, f'{field_name}_id', None)
+                self.fields[field_name].queryset = _active_users_including(current)
+        if not self.instance.pk and 'settled_on' in self.fields:
+            self.fields['settled_on'].initial = timezone.localdate()
+
+    def clean(self):
+        cleaned = super().clean()
+        from_user = cleaned.get('from_user')
+        to_user = cleaned.get('to_user')
+        if from_user and to_user and from_user.pk == to_user.pk:
+            raise forms.ValidationError(_('O pagador e o receptor têm de ser utilizadores diferentes.'))
+        return cleaned
 
 
 PurchaseContributionFormSet = inlineformset_factory(

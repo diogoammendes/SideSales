@@ -1,12 +1,14 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
+from .forms import SettlementTransferForm
 from .models import (
     AdditionalCost,
     Purchase,
     PurchaseContribution,
     Sale,
     SalePayment,
+    SettlementTransfer,
     SystemSettings,
     User,
 )
@@ -79,6 +81,14 @@ class SaleAdmin(admin.ModelAdmin):
 class SalePaymentAdmin(admin.ModelAdmin):
     list_display = ('sale', 'receiver', 'amount', 'method', 'paid_on')
     list_filter = ('method', 'paid_on')
+
+
+@admin.register(SettlementTransfer)
+class SettlementTransferAdmin(admin.ModelAdmin):
+    form = SettlementTransferForm
+    list_display = ('settled_on', 'from_user', 'to_user', 'amount', 'recorded_by')
+    list_filter = ('settled_on',)
+    search_fields = ('notes', 'from_user__username', 'to_user__username')
 
 
 @admin.register(SystemSettings)
