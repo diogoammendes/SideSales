@@ -380,13 +380,13 @@ class DistributionModeTests(BaseFinanceTest):
         
         # Admin invested 60%, gets 60% of profit (300)
         # Revenue = investment + profit = 600 + 300 = 900
-        self.assertEqual(admin_row['attributed_revenue'], Decimal('900'))
-        self.assertEqual(admin_row['attributed_profit'], Decimal('300'))
+        self.assertEqual(admin_row['received_attributed'], Decimal('900'))
+        self.assertEqual(admin_row['attributed_balance'], Decimal('300'))
         
         # Manager invested 40%, gets 40% of profit (200)
         # Revenue = investment + profit = 400 + 200 = 600
-        self.assertEqual(manager_row['attributed_revenue'], Decimal('600'))
-        self.assertEqual(manager_row['attributed_profit'], Decimal('200'))
+        self.assertEqual(manager_row['received_attributed'], Decimal('600'))
+        self.assertEqual(manager_row['attributed_balance'], Decimal('200'))
         
     def test_equal_distribution_ledger(self):
         """Equal mode: profit split equally regardless of investment."""
@@ -409,11 +409,11 @@ class DistributionModeTests(BaseFinanceTest):
         # Equal profit share = 500 / 2 = 250 each
         # Admin: investment 600 + profit 250 = 850
         # Manager: investment 400 + profit 250 = 650
-        self.assertEqual(admin_row['attributed_revenue'], Decimal('850'))
-        self.assertEqual(admin_row['attributed_profit'], Decimal('250'))
+        self.assertEqual(admin_row['received_attributed'], Decimal('850'))
+        self.assertEqual(admin_row['attributed_balance'], Decimal('250'))
         
-        self.assertEqual(manager_row['attributed_revenue'], Decimal('650'))
-        self.assertEqual(manager_row['attributed_profit'], Decimal('250'))
+        self.assertEqual(manager_row['received_attributed'], Decimal('650'))
+        self.assertEqual(manager_row['attributed_balance'], Decimal('250'))
         
     def test_proportional_distribution_settlement(self):
         """Settlement with proportional mode."""
@@ -537,6 +537,101 @@ class SettlementTransferTests(DistributionModeTests):
         self.client.login(username='viewer', password='pw')
         response = self.client.post(reverse('operations:settlement_register_suggested'))
         self.assertEqual(response.status_code, 403)
+
+    def test_settlement_page_renders_for_admin_and_viewer(self):
+        for username in ('admin', 'viewer'):
+            self.client.login(username=username, password='pw')
+            response = self.client.get(reverse('operations:settlement'))
+            self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context['can_manage_settlement'])
+
+    def test_manual_transfer_create_and_delete(self):
+        self.client.login(username='manager', password='pw')
+        response = self.client.post(reverse('operations:settlement_transfer_create'), {
+            'from_user': self.admin.pk,
+            'to_user': self.manager.pk,
+            'amount': '20.00',
+            'settled_on': '2026-10-09',
+            'notes': 'teste',
+        })
+        self.assertRedirects(response, reverse('operations:settlement'))
+        transfer = SettlementTransfer.objects.get()
+        self.assertEqual(transfer.recorded_by, self.manager)
+
+        response = self.client.post(
+            reverse('operations:settlement_transfer_delete', kwargs={'pk': transfer.pk})
+        )
+        self.assertRedirects(response, reverse('operations:settlement'))
+        self.assertFalse(SettlementTransfer.objects.exists())
+
+    def test_viewer_cannot_create_or_delete_transfer(self):
+        transfer = SettlementTransfer.objects.create(
+            from_user=self.admin, to_user=self.manager, amount=Decimal('5'),
+        )
+        self.client.login(username='viewer', password='pw')
+        response = self.client.post(reverse('operations:settlement_transfer_create'), {
+            'from_user': self.admin.pk, 'to_user': self.manager.pk,
+            'amount': '5', 'settled_on': '2026-10-09',
+        })
+        self.assertEqual(response.status_code, 403)
+        response = self.client.post(
+            reverse('operations:settlement_transfer_delete', kwargs={'pk': transfer.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(SettlementTransfer.objects.filter(pk=transfer.pk).exists())
+
+    def test_transfer_to_self_is_rejected(self):
+        with self.assertRaises(ValidationError):
+            SettlementTransfer.objects.create(
+                from_user=self.admin, to_user=self.admin, amount=Decimal('5'),
+            )
+        self.client.login(username='admin', password='pw')
+        self.client.post(reverse('operations:settlement_transfer_create'), {
+            'from_user': self.admin.pk, 'to_user': self.admin.pk,
+            'amount': '5', 'settled_on': '2026-10-09',
+        })
+        self.assertFalse(SettlementTransfer.objects.exists())
+
+    def test_settlement_page_data_includes_received_breakdown(self):
+        SettlementTransfer.objects.create(
+            from_user=self.admin, to_user=self.manager,
+            amount=Decimal('50'), recorded_by=self.admin,
+        )
+        purchases = list(Purchase.objects.prefetch_related(
+            'additional_costs__paid_by', 'contributions__payer',
+        ))
+        result = _compute_settlement(purchases)
+        admin_row = next(r for r in result['balance_rows'] if r['user'].pk == self.admin.pk)
+        self.assertEqual(admin_row['received_sales'], Decimal('900'))
+        self.assertEqual(admin_row['received_settlement_net'], Decimal('-50'))
+
+    def test_proportional_fallback_without_investment_conserves_money(self):
+        """No investments recorded: shares must sum to the money received."""
+        Purchase.objects.all().delete()
+        purchase = Purchase.objects.create(
+            title='NoInv', quantity=Decimal('1'), total_amount_eur=Decimal('0'),
+        )
+        sale = Sale.objects.create(
+            purchase=purchase, buyer_name='B', quantity=Decimal('1'),
+            unit_price=Decimal('100'), status=Sale.SaleStatus.CONFIRMED,
+        )
+        SalePayment.objects.create(
+            sale=sale, receiver=self.admin, amount=Decimal('100'),
+            method=SalePayment.PaymentMethod.CASH,
+        )
+        SettlementTransfer.objects.create(
+            from_user=self.admin, to_user=self.manager,
+            amount=Decimal('40'), recorded_by=self.admin,
+        )
+        SystemSettings.objects.update_or_create(
+            pk=1, defaults={'distribution_mode': SystemSettings.DistributionMode.PROPORTIONAL},
+        )
+
+        result = _compute_settlement(list(Purchase.objects.all()))
+        rows = {r['user'].pk: r for r in result['balance_rows']}
+        self.assertEqual(rows[self.admin.pk]['fair'], Decimal('100'))
+        self.assertEqual(rows[self.manager.pk]['fair'], Decimal('0'))
+        self.assertEqual(sum(r['fair'] for r in rows.values()), result['total_received'])
 
     def test_equal_profit_split_ignores_settlement_only_users(self):
         """Intermediaries with zero net settlement must not dilute equal profit."""

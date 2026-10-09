@@ -385,32 +385,34 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
     for uid in all_user_ids:
         invested = invested_by_user.get(uid, ZERO)
         received = received_by_user.get(uid, ZERO)
-        
-        if distribution_mode == SystemSettings.DistributionMode.EQUAL:
-            # Equal mode: profit split only among investors / sale receivers, not
-            # users who appear only as intermediaries in settlement transfers.
-            if uid in participant_user_ids:
-                equal_profit_share = total_profit / n_users
-                fair = invested + equal_profit_share
-                share_pct = (
-                    (fair / total_received * Decimal('100'))
-                    if total_received > ZERO
-                    else Decimal('100') / n_users
-                )
-            else:
-                fair = invested
-                share_pct = ZERO
+        received_sales = received_from_sales.get(uid, ZERO)
+        received_settlement_net = settlement_net.get(uid, ZERO)
+
+        if uid not in participant_user_ids:
+            # Appears only through recorded settlements: takes no part in the
+            # profit split, so the shares of participants still sum to the money
+            # actually received.
+            fair = invested
+            share_pct = ZERO
+        elif distribution_mode == SystemSettings.DistributionMode.EQUAL:
+            equal_profit_share = total_profit / n_users
+            fair = invested + equal_profit_share
+            share_pct = (
+                (fair / total_received * Decimal('100'))
+                if total_received > ZERO
+                else Decimal('100') / n_users
+            )
         elif total_invested > ZERO:
-            # Proportional mode: profit distributed by investment share
             investment_share = invested / total_invested
             proportional_profit = investment_share * total_profit
             fair = invested + proportional_profit
             share_pct = investment_share * Decimal('100')
         else:
-            # Fallback: equal distribution if no investment recorded
+            # No investment recorded: split what was received equally among participants.
             share_pct = Decimal('100') / n_users
             fair = total_received / n_users
-            
+
+
         balance = received - fair
         balances[uid] = {
             'invested': invested,
@@ -492,8 +494,78 @@ class SettlementView(LoginRequiredMixin, TemplateView):
         context['is_equal_mode'] = (
             settings.distribution_mode == SystemSettings.DistributionMode.EQUAL
         )
+        context['settlement_form'] = SettlementTransferForm()
+        context['settlement_history'] = (
+            SettlementTransfer.objects.select_related('from_user', 'to_user', 'recorded_by')[:50]
+        )
+        user = self.request.user
+        context['can_manage_settlement'] = (
+            user.is_superuser
+            or user.role in (User.Roles.ADMIN, User.Roles.MANAGER)
+        )
 
         return context
+
+
+class SettlementTransferCreateView(LoginRequiredMixin, RoleRequiredMixin, View):
+    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
+
+    @transaction.atomic
+    def post(self, request):
+        form = SettlementTransferForm(request.POST)
+        if form.is_valid():
+            transfer = form.save(commit=False)
+            transfer.recorded_by = request.user
+            transfer.save()
+            messages.success(request, _('Acerto registado.'))
+        else:
+            messages.error(request, _('Não foi possível registar o acerto. Verifique os dados.'))
+        return redirect('operations:settlement')
+
+
+class RegisterSuggestedSettlementsView(LoginRequiredMixin, RoleRequiredMixin, View):
+    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
+
+    @transaction.atomic
+    def post(self, request):
+        purchases = list(
+            Purchase.objects.prefetch_related(
+                'additional_costs__paid_by',
+                'contributions__payer',
+            )
+        )
+        transfers = _compute_settlement(purchases)['transfers']
+        if not transfers:
+            messages.info(request, _('Não há transferências pendentes para registar.'))
+            return redirect('operations:settlement')
+
+        settled_on = timezone.localdate()
+        for transfer in transfers:
+            SettlementTransfer.objects.create(
+                from_user_id=transfer['from_user_id'],
+                to_user_id=transfer['to_user_id'],
+                amount=transfer['amount'],
+                settled_on=settled_on,
+                recorded_by=request.user,
+                notes=_('Acerto sugerido'),
+            )
+        messages.success(
+            request,
+            _('%(count)s transferência(s) de acerto registada(s).')
+            % {'count': len(transfers)},
+        )
+        return redirect('operations:settlement')
+
+
+class SettlementTransferDeleteView(LoginRequiredMixin, RoleRequiredMixin, View):
+    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
+
+    @transaction.atomic
+    def post(self, request, pk):
+        transfer = get_object_or_404(SettlementTransfer, pk=pk)
+        transfer.delete()
+        messages.success(request, _('Acerto removido.'))
+        return redirect('operations:settlement')
 
 
 # ---------------------------------------------------------------------------
