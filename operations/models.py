@@ -345,6 +345,15 @@ class SettlementTransfer(TimeStampedModel):
         verbose_name = _('Acerto entre utilizadores')
         verbose_name_plural = _('Acertos entre utilizadores')
 
+    def clean(self) -> None:
+        super().clean()
+        if self.from_user_id and self.to_user_id and self.from_user_id == self.to_user_id:
+            raise ValidationError(_('O pagador e o receptor têm de ser utilizadores diferentes.'))
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
     def __str__(self) -> str:
         return f'{self.from_user} → {self.to_user}: {self.amount}'
 

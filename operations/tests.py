@@ -482,3 +482,94 @@ class DistributionModeTests(BaseFinanceTest):
         self.assertEqual(transfer['from_user_id'], self.admin.pk)
         self.assertEqual(transfer['to_user_id'], self.manager.pk)
         self.assertEqual(transfer['amount'], Decimal('50.00'))
+
+
+class SettlementTransferTests(DistributionModeTests):
+    def test_recorded_transfer_adjusts_received_and_balances(self):
+        settings = SystemSettings.get_settings()
+        settings.distribution_mode = SystemSettings.DistributionMode.EQUAL
+        settings.save()
+
+        purchases = list(Purchase.objects.prefetch_related(
+            'additional_costs__paid_by', 'contributions__payer',
+        ))
+        before = _compute_settlement(purchases)
+        admin_before = next(
+            r for r in before['balance_rows'] if r['user'].pk == self.admin.pk
+        )
+        self.assertEqual(admin_before['balance'], Decimal('50'))
+
+        SettlementTransfer.objects.create(
+            from_user=self.admin,
+            to_user=self.manager,
+            amount=Decimal('50'),
+            recorded_by=self.admin,
+        )
+
+        after = _compute_settlement(purchases)
+        admin_after = next(
+            r for r in after['balance_rows'] if r['user'].pk == self.admin.pk
+        )
+        manager_after = next(
+            r for r in after['balance_rows'] if r['user'].pk == self.manager.pk
+        )
+        self.assertEqual(admin_after['received'], Decimal('850'))
+        self.assertEqual(manager_after['received'], Decimal('650'))
+        self.assertEqual(admin_after['balance'], Decimal('0'))
+        self.assertEqual(manager_after['balance'], Decimal('0'))
+        self.assertEqual(after['transfers'], [])
+
+    def test_register_suggested_settlements_via_view(self):
+        settings = SystemSettings.get_settings()
+        settings.distribution_mode = SystemSettings.DistributionMode.EQUAL
+        settings.save()
+
+        self.client.login(username='admin', password='pw')
+        response = self.client.post(reverse('operations:settlement_register_suggested'))
+        self.assertRedirects(response, reverse('operations:settlement'))
+        self.assertEqual(SettlementTransfer.objects.count(), 1)
+        transfer = SettlementTransfer.objects.get()
+        self.assertEqual(transfer.from_user, self.admin)
+        self.assertEqual(transfer.to_user, self.manager)
+        self.assertEqual(transfer.amount, Decimal('50.00'))
+
+    def test_viewer_cannot_register_settlement(self):
+        self.client.login(username='viewer', password='pw')
+        response = self.client.post(reverse('operations:settlement_register_suggested'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_equal_profit_split_ignores_settlement_only_users(self):
+        """Intermediaries with zero net settlement must not dilute equal profit."""
+        settings = SystemSettings.get_settings()
+        settings.distribution_mode = SystemSettings.DistributionMode.EQUAL
+        settings.save()
+
+        intermediary = User.objects.create_user(
+            username='middle', password='pw', role=User.Roles.MANAGER,
+        )
+        SettlementTransfer.objects.create(
+            from_user=self.admin,
+            to_user=intermediary,
+            amount=Decimal('10'),
+            recorded_by=self.admin,
+        )
+        SettlementTransfer.objects.create(
+            from_user=intermediary,
+            to_user=self.manager,
+            amount=Decimal('10'),
+            recorded_by=self.admin,
+        )
+
+        purchases = list(Purchase.objects.prefetch_related(
+            'additional_costs__paid_by', 'contributions__payer',
+        ))
+        result = _compute_settlement(purchases)
+        admin_balance = next(
+            r for r in result['balance_rows'] if r['user'].pk == self.admin.pk
+        )
+        manager_balance = next(
+            r for r in result['balance_rows'] if r['user'].pk == self.manager.pk
+        )
+        self.assertEqual(admin_balance['fair'], Decimal('850'))
+        self.assertEqual(manager_balance['fair'], Decimal('650'))
+        self.assertFalse(any(r['user'].pk == intermediary.pk for r in result['balance_rows']))

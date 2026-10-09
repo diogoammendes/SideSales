@@ -163,7 +163,7 @@ def _settlement_net_by_user() -> dict[int, Decimal]:
     for transfer in SettlementTransfer.objects.only('from_user_id', 'to_user_id', 'amount'):
         nets[transfer.from_user_id] = nets.get(transfer.from_user_id, ZERO) - transfer.amount
         nets[transfer.to_user_id] = nets.get(transfer.to_user_id, ZERO) + transfer.amount
-    return nets
+    return {uid: net for uid, net in nets.items() if net != ZERO}
 
 
 def _compute_ledger(purchases: Iterable[Purchase]) -> tuple[list[dict], Decimal]:
@@ -369,9 +369,8 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
         p['receiver_id']: p['total'] or ZERO for p in payment_qs
     }
     settlement_net = _settlement_net_by_user()
-    all_user_ids = (
-        set(invested_by_user) | set(received_from_sales) | set(settlement_net)
-    )
+    participant_user_ids = set(invested_by_user) | set(received_from_sales)
+    all_user_ids = participant_user_ids | set(settlement_net)
     received_by_user: dict[int, Decimal] = {}
     for uid in all_user_ids:
         received_by_user[uid] = (
@@ -379,8 +378,7 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
         )
     total_received = sum(received_by_user.values(), ZERO)
 
-    all_user_ids = set(invested_by_user) | set(received_by_user)
-    n_users = len(all_user_ids) or 1
+    n_users = len(participant_user_ids) or 1
     total_profit = total_received - total_invested
 
     balances: dict[int, dict] = {}
@@ -389,11 +387,19 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
         received = received_by_user.get(uid, ZERO)
         
         if distribution_mode == SystemSettings.DistributionMode.EQUAL:
-            # Equal mode: each user gets their investment back + equal share of profit
-            equal_profit_share = total_profit / n_users
-            fair = invested + equal_profit_share
-            # Share percentage is based on fair amount relative to total received
-            share_pct = (fair / total_received * Decimal('100')) if total_received > ZERO else Decimal('100') / n_users
+            # Equal mode: profit split only among investors / sale receivers, not
+            # users who appear only as intermediaries in settlement transfers.
+            if uid in participant_user_ids:
+                equal_profit_share = total_profit / n_users
+                fair = invested + equal_profit_share
+                share_pct = (
+                    (fair / total_received * Decimal('100'))
+                    if total_received > ZERO
+                    else Decimal('100') / n_users
+                )
+            else:
+                fair = invested
+                share_pct = ZERO
         elif total_invested > ZERO:
             # Proportional mode: profit distributed by investment share
             investment_share = invested / total_invested
