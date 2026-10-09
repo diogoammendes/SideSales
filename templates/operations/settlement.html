@@ -47,7 +47,10 @@
     <header class="panel-header">
         <div>
             <h3>Posição atual por utilizador</h3>
-            <p class="muted">O resultado é o que cada utilizador recebeu menos o que investiu.</p>
+            <p class="muted">
+                O recebido inclui pagamentos de vendas e acertos registados entre utilizadores.
+                O resultado é o que cada utilizador recebeu menos o que investiu.
+            </p>
         </div>
     </header>
     <div class="table-wrapper">
@@ -67,7 +70,16 @@
                         <strong>{{ row.user.get_full_name|default:row.user.username }}</strong>
                     </td>
                     <td data-label="Investido">{{ row.invested|floatformat:2 }} €</td>
-                    <td data-label="Recebido">{{ row.received|floatformat:2 }} €</td>
+                    <td data-label="Recebido">
+                        {{ row.received|floatformat:2 }} €
+                        {% if row.received_settlement_net %}
+                            <br><small class="muted">
+                                vendas {{ row.received_sales|floatformat:2 }} €
+                                {% if row.received_settlement_net > 0 %}+{% endif %}
+                                acertos {{ row.received_settlement_net|floatformat:2 }} €
+                            </small>
+                        {% endif %}
+                    </td>
                     <td data-label="Resultado" class="{% if row.result < 0 %}text-danger{% else %}text-success{% endif %}">
                         {{ row.result|floatformat:2 }} €
                     </td>
@@ -128,7 +140,101 @@
                 </div>
             {% endfor %}
         </div>
+        {% if can_manage_settlement %}
+            <form method="post" action="{% url 'operations:settlement_register_suggested' %}" class="form-actions" style="margin-top: 1rem;">
+                {% csrf_token %}
+                <button type="submit" class="btn primary">Registar estas transferências como acerto</button>
+            </form>
+            <p class="muted" style="margin-top: 0.5rem;">
+                Ao registar, os valores recebidos de cada utilizador são ajustados (quem paga reduz o recebido; quem recebe aumenta).
+            </p>
+        {% endif %}
     {% endif %}
+</section>
+
+{% if can_manage_settlement %}
+<section class="panel">
+    <header class="panel-header">
+        <div>
+            <h3>Registar acerto manual</h3>
+            <p class="muted">Use quando uma transferência entre utilizadores já foi feita fora das sugestões acima.</p>
+        </div>
+    </header>
+    <form method="post" action="{% url 'operations:settlement_transfer_create' %}">
+        {% csrf_token %}
+        <div class="form-grid compact">
+            <div class="form-control compact">
+                <label for="id_from_user">Quem paga</label>
+                {{ settlement_form.from_user }}
+            </div>
+            <div class="form-control compact">
+                <label for="id_to_user">Quem recebe</label>
+                {{ settlement_form.to_user }}
+            </div>
+            <div class="form-control compact">
+                <label for="id_amount">Montante (€)</label>
+                {{ settlement_form.amount }}
+            </div>
+            <div class="form-control compact">
+                <label for="id_settled_on">Data</label>
+                {{ settlement_form.settled_on }}
+            </div>
+            <div class="form-control compact">
+                <label for="id_notes">Notas</label>
+                {{ settlement_form.notes }}
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn primary">Registar acerto</button>
+        </div>
+    </form>
+</section>
+{% endif %}
+
+<section class="panel">
+    <header class="panel-header">
+        <div>
+            <h3>Histórico de acertos</h3>
+            <p class="muted">Transferências já registadas entre utilizadores.</p>
+        </div>
+    </header>
+    <div class="table-wrapper">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>De</th>
+                <th>Para</th>
+                <th>Montante</th>
+                <th>Notas</th>
+                {% if can_manage_settlement %}<th></th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in settlement_history %}
+                <tr>
+                    <td data-label="Data">{{ item.settled_on|date:"d/m/Y" }}</td>
+                    <td data-label="De">{{ item.from_user.get_full_name|default:item.from_user.username }}</td>
+                    <td data-label="Para">{{ item.to_user.get_full_name|default:item.to_user.username }}</td>
+                    <td data-label="Montante">{{ item.amount|floatformat:2 }} €</td>
+                    <td data-label="Notas">{{ item.notes|default:"—" }}</td>
+                    {% if can_manage_settlement %}
+                        <td data-label="Ações" class="table-actions">
+                            <form method="post" action="{% url 'operations:settlement_transfer_delete' item.pk %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn ghost">apagar</button>
+                            </form>
+                        </td>
+                    {% endif %}
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="{% if can_manage_settlement %}6{% else %}5{% endif %}" class="muted">Nenhum acerto registado.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
 </section>
 
 {% endblock %}

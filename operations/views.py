@@ -28,10 +28,19 @@ from .forms import (
     PurchaseContributionForm,
     SaleForm,
     SalePaymentForm,
+    SettlementTransferForm,
     UserCreateForm,
     UserUpdateForm,
 )
-from .models import AdditionalCost, Purchase, PurchaseContribution, Sale, SalePayment, User
+from .models import (
+    AdditionalCost,
+    Purchase,
+    PurchaseContribution,
+    Sale,
+    SalePayment,
+    SettlementTransfer,
+    User,
+)
 
 
 ZERO = Decimal('0')
@@ -148,6 +157,15 @@ def _compute_sales_buckets(purchases: Iterable[Purchase]) -> tuple[dict[str, Sal
     return buckets, buckets['realized'].value, buckets['draft'].value
 
 
+def _settlement_net_by_user() -> dict[int, Decimal]:
+    """Net adjustment to received amounts from recorded inter-user settlements."""
+    nets: dict[int, Decimal] = {}
+    for transfer in SettlementTransfer.objects.only('from_user_id', 'to_user_id', 'amount'):
+        nets[transfer.from_user_id] = nets.get(transfer.from_user_id, ZERO) - transfer.amount
+        nets[transfer.to_user_id] = nets.get(transfer.to_user_id, ZERO) + transfer.amount
+    return nets
+
+
 def _compute_ledger(purchases: Iterable[Purchase]) -> tuple[list[dict], Decimal]:
     """Build the per-user ledger.
 
@@ -234,6 +252,10 @@ def _compute_ledger(purchases: Iterable[Purchase]) -> tuple[list[dict], Decimal]
     for payment in payment_totals:
         entry = entry_for(payment['receiver_id'])
         entry.actual_received = payment['total'] or ZERO
+
+    for user_id, net in _settlement_net_by_user().items():
+        entry = entry_for(user_id)
+        entry.actual_received += net
 
     # Resolve user objects in one query, including inactive ones.
     user_ids = list(ledger_map.keys())
@@ -343,9 +365,18 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
         .values('receiver_id')
         .annotate(total=Sum('amount'))
     )
-    received_by_user: dict[int, Decimal] = {
+    received_from_sales: dict[int, Decimal] = {
         p['receiver_id']: p['total'] or ZERO for p in payment_qs
     }
+    settlement_net = _settlement_net_by_user()
+    all_user_ids = (
+        set(invested_by_user) | set(received_from_sales) | set(settlement_net)
+    )
+    received_by_user: dict[int, Decimal] = {}
+    for uid in all_user_ids:
+        received_by_user[uid] = (
+            received_from_sales.get(uid, ZERO) + settlement_net.get(uid, ZERO)
+        )
     total_received = sum(received_by_user.values(), ZERO)
 
     all_user_ids = set(invested_by_user) | set(received_by_user)
@@ -356,7 +387,9 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
     for uid in all_user_ids:
         invested = invested_by_user.get(uid, ZERO)
         received = received_by_user.get(uid, ZERO)
-        
+        received_sales = received_from_sales.get(uid, ZERO)
+        received_settlement_net = settlement_net.get(uid, ZERO)
+
         if distribution_mode == SystemSettings.DistributionMode.EQUAL:
             # Equal mode: each user gets their investment back + equal share of profit
             equal_profit_share = total_profit / n_users
@@ -378,6 +411,8 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
         balances[uid] = {
             'invested': invested,
             'received': received,
+            'received_sales': received_sales,
+            'received_settlement_net': received_settlement_net,
             'result': received - invested,
             'share_pct': share_pct,
             'fair': fair,
@@ -454,8 +489,79 @@ class SettlementView(LoginRequiredMixin, TemplateView):
         context['distribution_mode_display'] = settings.get_distribution_mode_display()
         context['is_equal_mode'] = settings.distribution_mode == SystemSettings.DistributionMode.EQUAL
         context['distribution_choices'] = SystemSettings.DistributionMode.choices
-        
+        context['settlement_form'] = SettlementTransferForm()
+        context['settlement_history'] = (
+            SettlementTransfer.objects.select_related('from_user', 'to_user', 'recorded_by')[:50]
+        )
+        user = self.request.user
+        context['can_manage_settlement'] = (
+            user.is_superuser
+            or user.role in (User.Roles.ADMIN, User.Roles.MANAGER)
+        )
+
         return context
+
+
+class SettlementTransferCreateView(LoginRequiredMixin, RoleRequiredMixin, View):
+    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
+
+    @transaction.atomic
+    def post(self, request):
+        form = SettlementTransferForm(request.POST)
+        if form.is_valid():
+            transfer = form.save(commit=False)
+            transfer.recorded_by = request.user
+            transfer.save()
+            messages.success(request, _('Acerto registado.'))
+            return redirect('operations:settlement')
+        messages.error(request, _('Não foi possível registar o acerto. Verifique os dados.'))
+        return redirect('operations:settlement')
+
+
+class RegisterSuggestedSettlementsView(LoginRequiredMixin, RoleRequiredMixin, View):
+    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
+
+    @transaction.atomic
+    def post(self, request):
+        purchases = list(
+            Purchase.objects.prefetch_related(
+                'additional_costs__paid_by',
+                'contributions__payer',
+            )
+        )
+        result = _compute_settlement(purchases)
+        transfers = result['transfers']
+        if not transfers:
+            messages.info(request, _('Não há transferências pendentes para registar.'))
+            return redirect('operations:settlement')
+
+        settled_on = timezone.localdate()
+        for transfer in transfers:
+            SettlementTransfer.objects.create(
+                from_user_id=transfer['from_user_id'],
+                to_user_id=transfer['to_user_id'],
+                amount=transfer['amount'],
+                settled_on=settled_on,
+                recorded_by=request.user,
+                notes=_('Acerto sugerido'),
+            )
+        messages.success(
+            request,
+            _('%(count)s transferência(s) de acerto registada(s).')
+            % {'count': len(transfers)},
+        )
+        return redirect('operations:settlement')
+
+
+class SettlementTransferDeleteView(LoginRequiredMixin, RoleRequiredMixin, View):
+    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
+
+    @transaction.atomic
+    def post(self, request, pk):
+        transfer = get_object_or_404(SettlementTransfer, pk=pk)
+        transfer.delete()
+        messages.success(request, _('Acerto removido.'))
+        return redirect('operations:settlement')
 
 
 class UpdateDistributionModeView(LoginRequiredMixin, View):

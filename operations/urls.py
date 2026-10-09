@@ -7,6 +7,21 @@ app_name = 'operations'
 urlpatterns = [
     path('', views.DashboardView.as_view(), name='dashboard'),
     path('acerto/', views.SettlementView.as_view(), name='settlement'),
+    path(
+        'acerto/transferencias/nova/',
+        views.SettlementTransferCreateView.as_view(),
+        name='settlement_transfer_create',
+    ),
+    path(
+        'acerto/transferencias/registar-sugeridas/',
+        views.RegisterSuggestedSettlementsView.as_view(),
+        name='settlement_register_suggested',
+    ),
+    path(
+        'acerto/transferencias/<int:pk>/apagar/',
+        views.SettlementTransferDeleteView.as_view(),
+        name='settlement_transfer_delete',
+    ),
     path('configuracoes/distribuicao/', views.UpdateDistributionModeView.as_view(), name='update_distribution_mode'),
     # Purchases
     path('compras/', views.PurchaseListView.as_view(), name='purchase_list'),
