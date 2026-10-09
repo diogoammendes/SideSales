@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Configurações · SideSales{% endblock %}
+{% block content %}
+
+<header class="panel-header">
+    <div>
+        <h2>Configurações</h2>
+        <p class="muted">Parâmetros globais da aplicação</p>
+    </div>
+</header>
+
+<section class="panel">
+    <header class="panel-header">
+        <div>
+            <h3>Distribuição de lucros</h3>
+            <p class="muted">
+                Define como o lucro total das vendas é distribuído entre os utilizadores no acerto de contas.
+                Modo atual: <strong>{{ distribution_mode_display }}</strong>
+            </p>
+        </div>
+    </header>
+    <div class="panel-body">
+        <form method="post" action="{% url 'operations:update_distribution_mode' %}" style="max-width: 400px;">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="distribution_mode">Modo de distribuição:</label>
+                <select name="distribution_mode" id="distribution_mode" class="form-control" onchange="this.form.submit()">
+                    {% for value, label in distribution_choices %}
+                        <option value="{{ value }}" {% if value == distribution_mode %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <small class="form-text">
+                    <strong>Proporcional ao investimento:</strong> o lucro é dividido conforme o investimento de cada utilizador.<br>
+                    <strong>Lucro igual para todos (50/50):</strong> cada utilizador recebe o seu investimento de volta + parte igual do lucro total.
+                </small>
+            </div>
+        </form>
+    </div>
+</section>
+
+{% endblock %}

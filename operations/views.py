@@ -387,9 +387,7 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
     for uid in all_user_ids:
         invested = invested_by_user.get(uid, ZERO)
         received = received_by_user.get(uid, ZERO)
-        received_sales = received_from_sales.get(uid, ZERO)
-        received_settlement_net = settlement_net.get(uid, ZERO)
-
+        
         if distribution_mode == SystemSettings.DistributionMode.EQUAL:
             # Equal mode: each user gets their investment back + equal share of profit
             equal_profit_share = total_profit / n_users
@@ -482,111 +480,14 @@ class SettlementView(LoginRequiredMixin, TemplateView):
             )
         )
         context.update(_compute_settlement(purchases))
-        
+
         from operations.models import SystemSettings
         settings = SystemSettings.get_settings()
-        context['distribution_mode'] = settings.distribution_mode
-        context['distribution_mode_display'] = settings.get_distribution_mode_display()
-        context['is_equal_mode'] = settings.distribution_mode == SystemSettings.DistributionMode.EQUAL
-        context['distribution_choices'] = SystemSettings.DistributionMode.choices
-        context['settlement_form'] = SettlementTransferForm()
-        context['settlement_history'] = (
-            SettlementTransfer.objects.select_related('from_user', 'to_user', 'recorded_by')[:50]
-        )
-        user = self.request.user
-        context['can_manage_settlement'] = (
-            user.is_superuser
-            or user.role in (User.Roles.ADMIN, User.Roles.MANAGER)
+        context['is_equal_mode'] = (
+            settings.distribution_mode == SystemSettings.DistributionMode.EQUAL
         )
 
         return context
-
-
-class SettlementTransferCreateView(LoginRequiredMixin, RoleRequiredMixin, View):
-    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
-
-    @transaction.atomic
-    def post(self, request):
-        form = SettlementTransferForm(request.POST)
-        if form.is_valid():
-            transfer = form.save(commit=False)
-            transfer.recorded_by = request.user
-            transfer.save()
-            messages.success(request, _('Acerto registado.'))
-            return redirect('operations:settlement')
-        messages.error(request, _('Não foi possível registar o acerto. Verifique os dados.'))
-        return redirect('operations:settlement')
-
-
-class RegisterSuggestedSettlementsView(LoginRequiredMixin, RoleRequiredMixin, View):
-    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
-
-    @transaction.atomic
-    def post(self, request):
-        purchases = list(
-            Purchase.objects.prefetch_related(
-                'additional_costs__paid_by',
-                'contributions__payer',
-            )
-        )
-        result = _compute_settlement(purchases)
-        transfers = result['transfers']
-        if not transfers:
-            messages.info(request, _('Não há transferências pendentes para registar.'))
-            return redirect('operations:settlement')
-
-        settled_on = timezone.localdate()
-        for transfer in transfers:
-            SettlementTransfer.objects.create(
-                from_user_id=transfer['from_user_id'],
-                to_user_id=transfer['to_user_id'],
-                amount=transfer['amount'],
-                settled_on=settled_on,
-                recorded_by=request.user,
-                notes=_('Acerto sugerido'),
-            )
-        messages.success(
-            request,
-            _('%(count)s transferência(s) de acerto registada(s).')
-            % {'count': len(transfers)},
-        )
-        return redirect('operations:settlement')
-
-
-class SettlementTransferDeleteView(LoginRequiredMixin, RoleRequiredMixin, View):
-    required_roles = (User.Roles.ADMIN, User.Roles.MANAGER)
-
-    @transaction.atomic
-    def post(self, request, pk):
-        transfer = get_object_or_404(SettlementTransfer, pk=pk)
-        transfer.delete()
-        messages.success(request, _('Acerto removido.'))
-        return redirect('operations:settlement')
-
-
-class UpdateDistributionModeView(LoginRequiredMixin, View):
-    """Update the profit distribution mode setting."""
-    
-    def post(self, request):
-        from operations.models import SystemSettings
-        
-        if not request.user.has_elevated_privileges:
-            messages.error(request, 'Não tem permissões para alterar as configurações do sistema.')
-            return redirect('operations:settlement')
-        
-        mode = request.POST.get('distribution_mode')
-        if mode not in dict(SystemSettings.DistributionMode.choices):
-            messages.error(request, 'Modo de distribuição inválido.')
-            return redirect('operations:settlement')
-        
-        settings = SystemSettings.get_settings()
-        settings.distribution_mode = mode
-        settings.save()
-        
-        mode_display = settings.get_distribution_mode_display()
-        messages.success(request, f'Modo de distribuição alterado para: {mode_display}')
-        
-        return redirect('operations:settlement')
 
 
 # ---------------------------------------------------------------------------
@@ -1051,3 +952,41 @@ class UserPasswordUpdateView(_AdminOnlyUserMixin, View):
             return redirect('operations:user_list')
         messages.error(request, _('Por favor corrija os erros abaixo.'))
         return self._render(request, form)
+
+
+# ---------------------------------------------------------------------------
+# System settings
+# ---------------------------------------------------------------------------
+
+class SettingsView(_AdminOnlyUserMixin, TemplateView):
+    template_name = 'operations/settings.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from operations.models import SystemSettings
+        settings = SystemSettings.get_settings()
+        context['distribution_mode'] = settings.distribution_mode
+        context['distribution_mode_display'] = settings.get_distribution_mode_display()
+        context['distribution_choices'] = SystemSettings.DistributionMode.choices
+        return context
+
+
+class UpdateDistributionModeView(_AdminOnlyUserMixin, View):
+    """Update the profit distribution mode setting."""
+
+    def post(self, request):
+        from operations.models import SystemSettings
+
+        mode = request.POST.get('distribution_mode')
+        if mode not in dict(SystemSettings.DistributionMode.choices):
+            messages.error(request, 'Modo de distribuição inválido.')
+            return redirect('operations:settings')
+
+        settings = SystemSettings.get_settings()
+        settings.distribution_mode = mode
+        settings.save()
+
+        mode_display = settings.get_distribution_mode_display()
+        messages.success(request, f'Modo de distribuição alterado para: {mode_display}')
+
+        return redirect('operations:settings')

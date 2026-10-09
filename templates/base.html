@@ -61,9 +61,10 @@
                     </div>
                     {% if user.role == 'ADMIN' or user.is_superuser %}
                         <div class="nav-group">
-                            <span>Utilizadores</span>
-                            <a href="{% url 'operations:user_list' %}">Gestão</a>
+                            <span>Configuração</span>
+                            <a href="{% url 'operations:user_list' %}">Utilizadores</a>
                             <a href="{% url 'operations:user_create' %}">Novo utilizador</a>
+                            <a href="{% url 'operations:settings' %}">Configurações</a>
                         </div>
                     {% endif %}
                 </nav>
