@@ -525,13 +525,75 @@ class SettlementTransferTests(DistributionModeTests):
         settings.save()
 
         self.client.login(username='admin', password='pw')
-        response = self.client.post(reverse('operations:settlement_register_suggested'))
+        token = self.client.get(reverse('operations:settlement')).context['settlement_token']
+        response = self.client.post(
+            reverse('operations:settlement_register_suggested'),
+            {'settlement_token': token},
+        )
         self.assertRedirects(response, reverse('operations:settlement'))
         self.assertEqual(SettlementTransfer.objects.count(), 1)
         transfer = SettlementTransfer.objects.get()
         self.assertEqual(transfer.from_user, self.admin)
         self.assertEqual(transfer.to_user, self.manager)
         self.assertEqual(transfer.amount, Decimal('50.00'))
+
+    def _equal_mode_token(self):
+        settings = SystemSettings.get_settings()
+        settings.distribution_mode = SystemSettings.DistributionMode.EQUAL
+        settings.save()
+        self.client.login(username='admin', password='pw')
+        return self.client.get(reverse('operations:settlement')).context['settlement_token']
+
+    def test_register_suggested_rejects_missing_or_stale_token(self):
+        token = self._equal_mode_token()
+        url = reverse('operations:settlement_register_suggested')
+
+        self.client.post(url)
+        self.client.post(url, {'settlement_token': 'stale'})
+        self.assertEqual(SettlementTransfer.objects.count(), 0)
+
+        # A payment arriving after the page was opened changes the suggestion.
+        SalePayment.objects.create(
+            sale=Sale.objects.get(), receiver=self.manager, amount=Decimal('100'),
+            method=SalePayment.PaymentMethod.CASH,
+        )
+        self.client.post(url, {'settlement_token': token})
+        self.assertEqual(SettlementTransfer.objects.count(), 0)
+
+    def test_register_suggested_cannot_be_recorded_twice(self):
+        token = self._equal_mode_token()
+        url = reverse('operations:settlement_register_suggested')
+        self.client.post(url, {'settlement_token': token})
+        self.client.post(url, {'settlement_token': token})
+        self.assertEqual(SettlementTransfer.objects.count(), 1)
+
+    def test_invalid_manual_transfer_rerenders_form_with_errors(self):
+        self.client.login(username='admin', password='pw')
+        response = self.client.post(reverse('operations:settlement_transfer_create'), {
+            'from_user': self.admin.pk, 'to_user': self.admin.pk,
+            'amount': '7.50', 'settled_on': '2026-10-09', 'notes': 'manter',
+        })
+        self.assertEqual(response.status_code, 200)
+        form = response.context['settlement_form']
+        self.assertTrue(form.errors)
+        self.assertContains(response, 'utilizadores diferentes')
+        self.assertContains(response, 'value="7.50"')
+        self.assertContains(response, 'manter')
+        self.assertFalse(SettlementTransfer.objects.exists())
+
+    def test_history_is_paginated_and_all_transfers_reachable(self):
+        for i in range(25):
+            SettlementTransfer.objects.create(
+                from_user=self.admin, to_user=self.manager,
+                amount=Decimal('1'), notes=f'n{i}',
+            )
+        self.client.login(username='admin', password='pw')
+        url = reverse('operations:settlement')
+        first = self.client.get(url).context['settlement_history']
+        second = self.client.get(url, {'page': 2}).context['settlement_history']
+        self.assertEqual(len(first), 20)
+        self.assertEqual(len(second), 5)
+        self.assertEqual(first.paginator.count, 25)
 
     def test_viewer_cannot_register_settlement(self):
         self.client.login(username='viewer', password='pw')

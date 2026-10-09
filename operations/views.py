@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Iterable
@@ -11,6 +12,7 @@ from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.views import LoginView as AuthLoginView
 from django.contrib.sessions.models import Session
 from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import ProtectedError, Sum
 from django.shortcuts import get_object_or_404, redirect, render
@@ -476,34 +478,55 @@ def _compute_settlement(purchases: Iterable[Purchase]) -> dict:
     }
 
 
+SETTLEMENT_HISTORY_PAGE_SIZE = 20
+
+
+def _settlement_purchases() -> list[Purchase]:
+    return list(
+        Purchase.objects.prefetch_related(
+            'additional_costs__paid_by',
+            'contributions__payer',
+        )
+    )
+
+
+def _transfers_token(transfers: list[dict]) -> str:
+    """Fingerprint of a suggested-transfer batch, so a POST can prove it
+    refers to exactly what the manager saw on screen."""
+    raw = '|'.join(
+        f"{t['from_user_id']}:{t['to_user_id']}:{t['amount']}" for t in transfers
+    )
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _settlement_page_context(request, form: SettlementTransferForm | None = None) -> dict:
+    from operations.models import SystemSettings
+
+    context = _compute_settlement(_settlement_purchases())
+    settings = SystemSettings.get_settings()
+    context['is_equal_mode'] = (
+        settings.distribution_mode == SystemSettings.DistributionMode.EQUAL
+    )
+    context['settlement_token'] = _transfers_token(context['transfers'])
+    context['settlement_form'] = form or SettlementTransferForm()
+
+    history = SettlementTransfer.objects.select_related('from_user', 'to_user', 'recorded_by')
+    paginator = Paginator(history, SETTLEMENT_HISTORY_PAGE_SIZE)
+    context['settlement_history'] = paginator.get_page(request.GET.get('page'))
+
+    user = request.user
+    context['can_manage_settlement'] = (
+        user.is_superuser or user.role in (User.Roles.ADMIN, User.Roles.MANAGER)
+    )
+    return context
+
+
 class SettlementView(LoginRequiredMixin, TemplateView):
     template_name = 'operations/settlement.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        purchases = list(
-            Purchase.objects.prefetch_related(
-                'additional_costs__paid_by',
-                'contributions__payer',
-            )
-        )
-        context.update(_compute_settlement(purchases))
-
-        from operations.models import SystemSettings
-        settings = SystemSettings.get_settings()
-        context['is_equal_mode'] = (
-            settings.distribution_mode == SystemSettings.DistributionMode.EQUAL
-        )
-        context['settlement_form'] = SettlementTransferForm()
-        context['settlement_history'] = (
-            SettlementTransfer.objects.select_related('from_user', 'to_user', 'recorded_by')[:50]
-        )
-        user = self.request.user
-        context['can_manage_settlement'] = (
-            user.is_superuser
-            or user.role in (User.Roles.ADMIN, User.Roles.MANAGER)
-        )
-
+        context.update(_settlement_page_context(self.request))
         return context
 
 
@@ -518,9 +541,13 @@ class SettlementTransferCreateView(LoginRequiredMixin, RoleRequiredMixin, View):
             transfer.recorded_by = request.user
             transfer.save()
             messages.success(request, _('Acerto registado.'))
-        else:
-            messages.error(request, _('Não foi possível registar o acerto. Verifique os dados.'))
-        return redirect('operations:settlement')
+            return redirect('operations:settlement')
+        messages.error(request, _('Não foi possível registar o acerto. Corrija os erros abaixo.'))
+        return render(
+            request,
+            SettlementView.template_name,
+            _settlement_page_context(request, form=form),
+        )
 
 
 class RegisterSuggestedSettlementsView(LoginRequiredMixin, RoleRequiredMixin, View):
@@ -528,15 +555,24 @@ class RegisterSuggestedSettlementsView(LoginRequiredMixin, RoleRequiredMixin, Vi
 
     @transaction.atomic
     def post(self, request):
-        purchases = list(
-            Purchase.objects.prefetch_related(
-                'additional_costs__paid_by',
-                'contributions__payer',
-            )
-        )
-        transfers = _compute_settlement(purchases)['transfers']
+        from operations.models import SystemSettings
+
+        # Serialise concurrent requests on PostgreSQL: the second one waits here,
+        # then recomputes against the first one's committed transfers and is
+        # rejected by the token check below.
+        SystemSettings.get_settings()
+        SystemSettings.objects.select_for_update().get(pk=1)
+
+        transfers = _compute_settlement(_settlement_purchases())['transfers']
         if not transfers:
             messages.info(request, _('Não há transferências pendentes para registar.'))
+            return redirect('operations:settlement')
+
+        if request.POST.get('settlement_token') != _transfers_token(transfers):
+            messages.error(
+                request,
+                _('Os saldos mudaram desde que abriu esta página. Reveja as transferências e tente novamente.'),
+            )
             return redirect('operations:settlement')
 
         settled_on = timezone.localdate()

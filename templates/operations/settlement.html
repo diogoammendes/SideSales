@@ -109,6 +109,7 @@
         {% if can_manage_settlement %}
             <form method="post" action="{% url 'operations:settlement_register_suggested' %}" class="form-actions" style="margin-top: 1rem;">
                 {% csrf_token %}
+                <input type="hidden" name="settlement_token" value="{{ settlement_token }}">
                 <button type="submit" class="btn primary">Registar estas transferências como acerto</button>
             </form>
             <p class="muted" style="margin-top: 0.5rem;">
@@ -128,27 +129,19 @@
     </header>
     <form method="post" action="{% url 'operations:settlement_transfer_create' %}">
         {% csrf_token %}
+        {% for error in settlement_form.non_field_errors %}
+            <small class="error-text">{{ error }}</small>
+        {% endfor %}
         <div class="form-grid compact">
-            <div class="form-control compact">
-                <label for="id_from_user">Quem paga</label>
-                {{ settlement_form.from_user }}
-            </div>
-            <div class="form-control compact">
-                <label for="id_to_user">Quem recebe</label>
-                {{ settlement_form.to_user }}
-            </div>
-            <div class="form-control compact">
-                <label for="id_amount">Montante (€)</label>
-                {{ settlement_form.amount }}
-            </div>
-            <div class="form-control compact">
-                <label for="id_settled_on">Data</label>
-                {{ settlement_form.settled_on }}
-            </div>
-            <div class="form-control compact">
-                <label for="id_notes">Notas</label>
-                {{ settlement_form.notes }}
-            </div>
+            {% for field in settlement_form %}
+                <div class="form-control compact">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}
+                        <small class="error-text">{{ error }}</small>
+                    {% endfor %}
+                </div>
+            {% endfor %}
         </div>
         <div class="form-actions">
             <button type="submit" class="btn primary">Registar acerto</button>
@@ -201,6 +194,17 @@
         </tbody>
     </table>
     </div>
+    {% if settlement_history.paginator.num_pages > 1 %}
+        <nav class="form-actions" aria-label="Paginação do histórico">
+            {% if settlement_history.has_previous %}
+                <a class="btn ghost" href="?page={{ settlement_history.previous_page_number }}">Anterior</a>
+            {% endif %}
+            <span class="muted">Página {{ settlement_history.number }} de {{ settlement_history.paginator.num_pages }}</span>
+            {% if settlement_history.has_next %}
+                <a class="btn ghost" href="?page={{ settlement_history.next_page_number }}">Seguinte</a>
+            {% endif %}
+        </nav>
+    {% endif %}
 </section>
 
 {% endblock %}
